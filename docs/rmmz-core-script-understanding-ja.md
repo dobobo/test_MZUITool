@@ -203,3 +203,99 @@ Game_Party.prototype.gainGold = function(amount) {
 - パフォーマンス改善前後の計測値
 
 運用としては、機能追加ごとに「どの章に関係したか」を1行追記すると、開発資産として価値が上がります。
+
+---
+
+## 12. 実ファイル確認ログ（Project1 / MZ 1.10.0）
+
+今回提供された `Project1.zip` 内 `js/` を確認し、以下を実コードで検証済みです。
+
+### 12.1 バージョン識別
+
+- `js/rmmz_core.js`
+  - `Utils.RPGMAKER_NAME = "MZ";`
+  - `Utils.RPGMAKER_VERSION = "1.10.0";`
+
+### 12.2 起動〜ロード（Scene_Boot）
+
+- `Scene_Boot.prototype.create`
+  - `DataManager.loadDatabase();`
+  - `StorageManager.updateForageKeys();`
+- `Scene_Boot.prototype.isReady`
+  - `DataManager.isDatabaseLoaded()` と `StorageManager.forageKeysUpdated()` を待機
+- `Scene_Boot.prototype.onDatabaseLoaded`
+  - 暗号設定 / システム画像 / プレイヤーデータ / フォントロード
+- `Scene_Boot.prototype.start`
+  - BattleTest / EventTest / TitleSkip / 通常開始の分岐
+
+実装示唆:
+
+- 起動直後依存の処理は `Scene_Boot` の ready 条件を壊さないように追加する
+- DB未ロード時に `$data*` を参照しない
+
+### 12.3 更新ループ（SceneManager）
+
+- `SceneManager.update`
+  - `determineRepeatNumber(deltaTime)` で更新回数を決定
+- `SceneManager.updateMain`
+  - `updateFrameCount()`
+  - `updateInputData()`（`Input.update()`, `TouchInput.update()`）
+  - `updateEffekseer()`
+  - `changeScene()`
+  - `updateScene()`
+
+実装示唆:
+
+- 毎フレームの追加処理は `updateMain` 相当の負荷を意識する
+- 入力系の横取りは `Input`/`TouchInput` の更新順を前提に検討する
+
+### 12.4 ゲーム実体生成（DataManager）
+
+- `DataManager.createGameObjects`
+  - `$gameTemp` 〜 `$gamePlayer` の主要実体を生成
+- `DataManager.setupNewGame`
+  - 実体生成、開始メンバー設定、プレイヤー初期化、`Graphics.frameCount = 0`
+
+実装示唆:
+
+- ニューゲーム依存初期化は `setupNewGame` 後の時点を前提にする
+- `$game*` への拡張プロパティは未初期化アクセスを避けるガードを入れる
+
+### 12.5 セーブ内容（DataManager.makeSaveContents）
+
+セーブ格納対象（確認済み）:
+
+- `system`, `screen`, `timer`, `switches`, `variables`, `selfSwitches`
+- `actors`, `party`, `map`, `player`
+
+非格納コメント（コード内注記）:
+
+- `$gameTemp`, `$gameMessage`, `$gameTroop` はセーブに含まれない
+
+実装示唆:
+
+- 永続化が必要な状態はセーブ対象オブジェクト側へ持たせる
+- 一時値は再計算可能に設計し、ロード復元対象にしない
+
+### 12.6 プラグインコマンド解決（PluginManager）
+
+- `PluginManager.parameters(name)`
+  - `name.toLowerCase()` キーでパラメータ取得
+- `PluginManager.registerCommand(pluginName, commandName, func)`
+  - `pluginName:commandName` で登録
+- `PluginManager.callCommand(self, pluginName, commandName, args)`
+  - 該当関数を `bind(self)` で呼び出し
+
+実装示唆:
+
+- プラグイン名の大小文字ゆれを避ける
+- コマンド名変更時は既存イベントとの互換性に注意する
+
+### 12.7 設定保存（ConfigManager）
+
+- `ConfigManager.load/save/makeData/applyData` の責務分離を確認
+- プレイヤー設定系は `ConfigManager` へ寄せるのが自然
+
+---
+
+この検証ログは、次回以降のプラグイン実装レビュー時に「どの層を触るべきか」を即判断する基準として利用できます。
