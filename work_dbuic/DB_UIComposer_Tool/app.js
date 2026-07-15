@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.27";
+  const TOOL_VERSION = "0.4.28";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -4689,8 +4689,9 @@
     for (const win of state.windows || []) {
       if (!orderedWindows.includes(win)) orderedWindows.push(win);
     }
-    const totalWin = orderedWindows.length;
-    orderedWindows.forEach((win, index) => { win.zOrder = totalWin - index; });
+    // 一覧は「上ほど奥、下ほど手前」の運用に合わせます。
+    // 先頭(背景)を最背面へ、末尾(前面ガイド等)を最前面へ配置します。
+    orderedWindows.forEach((win, index) => { win.zOrder = index + 1; });
     for (const win of state.windows || []) {
       const items = Array.isArray(win.items) ? win.items : [];
       const total = items.length;
