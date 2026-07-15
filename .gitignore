@@ -1,0 +1,4 @@
+# Working directory created by extracting the committed release ZIP for local dev.
+# The product is shipped as the release ZIP; extracted source is not committed.
+/DB_UIComposer_extracted/
+node_modules/
