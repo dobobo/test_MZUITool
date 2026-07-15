@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.28";
+  const TOOL_VERSION = "0.4.29";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -4161,23 +4161,23 @@
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Layering_Basics", name: "Layering_Basics", groupIds: ["bg_group", "content_group", "guide_group"], includeUngrouped: false },
+          scene: { id: "Layering_Basics", name: "Layering_Basics", groupIds: ["guide_group", "content_group", "bg_group"], includeUngrouped: false },
           groups: [
-            { id: "bg_group", name: "背景", visible: true, locked: false },
+            { id: "guide_group", name: "前面ガイド", visible: true, locked: false },
             { id: "content_group", name: "本文", visible: true, locked: false },
-            { id: "guide_group", name: "前面ガイド", visible: true, locked: false }
+            { id: "bg_group", name: "背景", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Background_Window", "bg_group", 24, 20, 768, 560, [
-              sampleTextItem("Background_Label", 24, 20, "背景ウィンドウ（zOrder: -300）\n常に後ろへ置く基礎見本", 22, 520, { color: "#bcd0ea", zOrder: -10 })
-            ], { opacity: 160, backgroundType: "dim", zOrder: -300 }),
+            sampleWindowBase("Guide_Window", "guide_group", 80, 488, 644, 82, [
+              sampleTextItem("Guide_Text", 14, 10, "このウィンドウは説明用（前面）です。完成時は非表示にしてください。", 15, 604, { color: "#ffe0a8", zOrder: 100 })
+            ], { opacity: 140, zOrder: 240 }),
             sampleWindowBase("Content_Window", "content_group", 92, 120, 620, 340, [
               sampleTextItem("Content_Title", 22, 14, "本文ウィンドウ（zOrder: 0）", 28, 460, { color: "#ffffff", zOrder: 20 }),
               sampleTextItem("Content_Desc", 22, 64, "背景は低いzOrder、本文は中間、ガイドは高いzOrderにすると\n前後関係の混乱を防げます。", 17, 560, { color: "#d5e2f5", zOrder: 30 })
             ], { zOrder: 0 }),
-            sampleWindowBase("Guide_Window", "guide_group", 80, 488, 644, 82, [
-              sampleTextItem("Guide_Text", 14, 10, "このウィンドウは説明用（前面）です。完成時は非表示にしてください。", 15, 604, { color: "#ffe0a8", zOrder: 100 })
-            ], { opacity: 140, zOrder: 240 })
+            sampleWindowBase("Background_Window", "bg_group", 24, 20, 768, 560, [
+              sampleTextItem("Background_Label", 24, 20, "背景ウィンドウ（最背面）\n常に後ろへ置く基礎見本", 22, 520, { color: "#bcd0ea", zOrder: -10 })
+            ], { opacity: 160, backgroundType: "dim", zOrder: -300 })
           ]
         }
       },
@@ -4689,9 +4689,9 @@
     for (const win of state.windows || []) {
       if (!orderedWindows.includes(win)) orderedWindows.push(win);
     }
-    // 一覧は「上ほど奥、下ほど手前」の運用に合わせます。
-    // 先頭(背景)を最背面へ、末尾(前面ガイド等)を最前面へ配置します。
-    orderedWindows.forEach((win, index) => { win.zOrder = index + 1; });
+    // 一覧は Photoshop レイヤー同様に「上ほど手前、下ほど奥」で同期します。
+    const totalWin = orderedWindows.length;
+    orderedWindows.forEach((win, index) => { win.zOrder = totalWin - index; });
     for (const win of state.windows || []) {
       const items = Array.isArray(win.items) ? win.items : [];
       const total = items.length;
