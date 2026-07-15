@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.26";
+  const TOOL_VERSION = "0.4.27";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -4155,184 +4155,178 @@
   function createSampleSceneTemplates() {
     return [
       {
-        id: "sampleBasicStatus",
+        id: "sampleLayeringBasics",
         kind: "scene",
-        name: "Basic_Status：基本ステータス画面",
+        name: "01_Layering_Basics：背景を後ろに置く標準構成",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Basic_Status", name: "Basic_Status", groupIds: ["status_root", "actor_info", "gauge_group", "param_group", "guide_labels"], includeUngrouped: false },
+          scene: { id: "Layering_Basics", name: "Layering_Basics", groupIds: ["bg_group", "content_group", "guide_group"], includeUngrouped: false },
           groups: [
-            { id: "status_root", name: "背景・立ち絵枠", visible: true, locked: false },
-            { id: "actor_info", name: "名前・職業ブロック", visible: true, locked: false },
-            { id: "gauge_group", name: "HP/MP/TPゲージ", visible: true, locked: false },
-            { id: "param_group", name: "能力値リスト", visible: true, locked: false },
-            { id: "guide_labels", name: "説明ラベル（非表示可）", visible: true, locked: false }
+            { id: "bg_group", name: "背景", visible: true, locked: false },
+            { id: "content_group", name: "本文", visible: true, locked: false },
+            { id: "guide_group", name: "前面ガイド", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Status_Background_Window", "status_root", 40, 36, 736, 520, [
-              sampleTextItem("Status_Title", 22, 14, "STATUS", 30, 240, { color: "#ffffff" }),
-              sampleTextItem("Status_SubTitle", 24, 52, "Basic sample / edit and reuse freely", 15, 420, { color: "#b9c8df" })
-            ], { opacity: 210 }),
-            sampleWindowBase("Actor_Stand_Window", "status_root", 62, 118, 220, 360, [
-              sampleTextItem("Stand_Dummy", 22, 130, "立ち絵\nPLACEHOLDER", 25, 170, { align: "center", color: "#d7e6ff" }),
-              sampleTextItem("Stand_Note", 18, 282, "ここに画像パーツや統合画像を配置", 14, 180, { align: "center", color: "#9fb0c8" })
-            ], { backgroundType: "dim", opacity: 190 }),
-            sampleWindowBase("Actor_Info_Window", "actor_info", 310, 108, 420, 116, [
-              sampleTextItem("Actor_Name", 22, 12, "主人公", 28, 180, { color: "#ffffff" }),
-              sampleTextItem("Actor_Level", 250, 18, "Lv 12", 22, 100, { color: "#ffffff" }),
-              sampleTextItem("Actor_Class", 24, 58, "クラス：見習い冒険者", 18, 260, { color: "#cfe0ff" })
-            ]),
-            sampleWindowBase("Gauge_Window", "gauge_group", 310, 242, 420, 160, [
-              sampleTextItem("Hp_Label", 20, 16, "HP", 18, 50, { color: "#ffc0c0" }),
-              sampleGaugeItem("Hp_Gauge", 70, 20, 250, 16, 75, 100, "", "#ff5a5a", "#ffb0b0"),
-              sampleTextItem("Mp_Label", 20, 52, "MP", 18, 50, { color: "#b8d4ff" }),
-              sampleGaugeItem("Mp_Gauge", 70, 56, 250, 16, 42, 80, "", "#4b8bff", "#b8d4ff"),
-              sampleTextItem("Tp_Label", 338, 18, "TP", 16, 50, { align: "center", color: "#ffe7a0" }),
-              sampleGaugeItem("Tp_Circle", 332, 42, 58, 58, 35, 100, "", "#ffd15a", "#fff0a8", "circle", "clockwise")
-            ]),
-            sampleWindowBase("Parameter_Window", "param_group", 310, 420, 420, 92, [
-              sampleTextItem("Param_ATK", 20, 10, "攻撃  24", 18, 120),
-              sampleTextItem("Param_DEF", 160, 10, "防御  18", 18, 120),
-              sampleTextItem("Param_MAT", 20, 42, "魔法  31", 18, 120),
-              sampleTextItem("Param_AGI", 160, 42, "敏捷  22", 18, 120)
-            ]),
-            sampleWindowBase("Guide_Label_Window", "guide_labels", 58, 520, 710, 48, [
-              sampleTextItem("Guide_Text", 14, 8, "説明用ラベル：グループごと非表示にできます。各部品は一覧右端の保存アイコンで再利用可能です。", 15, 660, { color: "#d9e6ff" })
-            ], { opacity: 150 })
+            sampleWindowBase("Background_Window", "bg_group", 24, 20, 768, 560, [
+              sampleTextItem("Background_Label", 24, 20, "背景ウィンドウ（zOrder: -300）\n常に後ろへ置く基礎見本", 22, 520, { color: "#bcd0ea", zOrder: -10 })
+            ], { opacity: 160, backgroundType: "dim", zOrder: -300 }),
+            sampleWindowBase("Content_Window", "content_group", 92, 120, 620, 340, [
+              sampleTextItem("Content_Title", 22, 14, "本文ウィンドウ（zOrder: 0）", 28, 460, { color: "#ffffff", zOrder: 20 }),
+              sampleTextItem("Content_Desc", 22, 64, "背景は低いzOrder、本文は中間、ガイドは高いzOrderにすると\n前後関係の混乱を防げます。", 17, 560, { color: "#d5e2f5", zOrder: 30 })
+            ], { zOrder: 0 }),
+            sampleWindowBase("Guide_Window", "guide_group", 80, 488, 644, 82, [
+              sampleTextItem("Guide_Text", 14, 10, "このウィンドウは説明用（前面）です。完成時は非表示にしてください。", 15, 604, { color: "#ffe0a8", zOrder: 100 })
+            ], { opacity: 140, zOrder: 240 })
           ]
         }
       },
       {
-        id: "sampleGaugeSample",
+        id: "sampleTextLogBasics",
         kind: "scene",
-        name: "Gauge_Sample：ゲージ一覧",
+        name: "02_Text_Log_Basics：text/logカテゴリの基本",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Gauge_Sample", name: "Gauge_Sample", groupIds: ["gauge_samples"], includeUngrouped: false },
-          groups: [{ id: "gauge_samples", name: "ゲージサンプル", visible: true, locked: false }],
+          scene: { id: "Text_Log_Basics", name: "Text_Log_Basics", groupIds: ["textlog_group"], includeUngrouped: false },
+          groups: [{ id: "textlog_group", name: "Text/Log", visible: true, locked: false }],
           windows: [
-            sampleWindowBase("Gauge_Sample_Window", "gauge_samples", 80, 70, 620, 420, [
-              sampleTextItem("Gauge_Title", 22, 16, "Gauge Sample", 28, 260),
-              sampleTextItem("H_Label", 36, 76, "横ゲージ：左→右 / 右→左", 18, 260),
-              sampleGaugeItem("Horizontal_LR", 36, 112, 240, 18, 65, 100, "", "#66ccff", "#d0f1ff", "horizontal", "leftToRight"),
-              sampleGaugeItem("Horizontal_RL", 36, 148, 240, 18, 40, 100, "", "#ff8e66", "#ffd6c4", "horizontal", "rightToLeft"),
-              sampleTextItem("V_Label", 330, 76, "縦ゲージ：上下方向", 18, 220),
-              sampleGaugeItem("Vertical_BU", 344, 112, 28, 160, 70, 100, "", "#8aff7d", "#d4ffd0", "vertical", "bottomToTop"),
-              sampleGaugeItem("Vertical_TB", 398, 112, 28, 160, 45, 100, "", "#c98aff", "#ecd6ff", "vertical", "topToBottom"),
-              sampleTextItem("C_Label", 36, 220, "円ゲージ：時計回り / 反時計回り", 18, 300),
-              sampleGaugeItem("Circle_CW", 60, 260, 86, 86, 75, 100, "", "#ffd25a", "#fff0a8", "circle", "clockwise"),
-              sampleGaugeItem("Circle_CCW", 190, 260, 86, 86, 45, 100, "", "#ff7ab8", "#ffd0e6", "circle", "counterClockwise")
+            sampleWindowBase("Text_Log_Window", "textlog_group", 70, 56, 680, 500, [
+              sampleTextItem("Text_Title", 20, 14, "textカテゴリの見本（複数行・揃え・色）", 27, 560, { color: "#ffffff", zOrder: 10 }),
+              sampleTextItem("Text_MultiLine", 20, 64, "1行目：テキスト基本\n2行目：インライン編集の改行確認\n3行目：outline/color/fontSize調整対象", 18, 620, { color: "#dce8ff", zOrder: 20 }),
+              { type: "log", id: "Log_Preview", x: 20, y: 190, width: 620, height: 220, fontSize: 18, lineHeight: 30, color: "#ffffff", paddingX: 8, paddingY: 8, maxLines: 5, displayFrames: 180, fadeFrames: 30, moveFrames: 20, sampleText: "ログを追加しました。\nアイテムを入手しました。\nHPが10回復しました。\n目的地を更新しました。", zOrder: 30, visible: true },
+              sampleTextItem("Log_Guide", 20, 430, "logカテゴリは AddItemLogText コマンド連携向けです。", 15, 620, { color: "#b8d0f0", zOrder: 40 })
             ])
           ]
         }
       },
       {
-        id: "sampleLogSample",
+        id: "sampleGaugeDirections",
         kind: "scene",
-        name: "Log_Sample：ログ表示",
+        name: "03_Gauge_Directions：横/縦/円ゲージ比較",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Log_Sample", name: "Log_Sample", groupIds: ["log_samples"], includeUngrouped: false },
-          groups: [{ id: "log_samples", name: "ログサンプル", visible: true, locked: false }],
+          scene: { id: "Gauge_Directions", name: "Gauge_Directions", groupIds: ["gauge_group"], includeUngrouped: false },
+          groups: [{ id: "gauge_group", name: "Gauge", visible: true, locked: false }],
           windows: [
-            sampleWindowBase("Log_Sample_Window", "log_samples", 80, 80, 620, 340, [
-              sampleTextItem("Log_Title", 20, 16, "Log Item Sample", 28, 300),
-              { type: "log", id: "Notice_Log", x: 26, y: 72, width: 520, height: 170, fontSize: 18, lineHeight: 30, color: "#ffffff", paddingX: 8, paddingY: 8, maxLines: 5, lineVisibleFrames: 180, fadeFrames: 30, moveFrames: 20, sampleText: "ログを追加しました。\nアイテムを入手しました。\nHPが回復しました。\n新しいクエストが開始されました。", zOrder: 0, visible: true },
-              sampleTextItem("Log_Guide", 26, 260, "MZ側では AddItemLogText でこのログパーツに行を追加できます。", 16, 520, { color: "#cfe0ff" })
+            sampleWindowBase("Gauge_Window", "gauge_group", 70, 54, 680, 500, [
+              sampleTextItem("Gauge_Title", 20, 12, "gaugeカテゴリ：方向・形状・開始角度", 27, 520, { color: "#ffffff", zOrder: 10 }),
+              sampleGaugeItem("Gauge_H_LR", 30, 86, 260, 18, 72, 100, "", "#66ccff", "#d0f1ff", "horizontal", "leftToRight"),
+              sampleGaugeItem("Gauge_H_RL", 30, 122, 260, 18, 45, 100, "", "#ff8e66", "#ffd6c4", "horizontal", "rightToLeft"),
+              sampleGaugeItem("Gauge_V_BT", 352, 86, 30, 160, 64, 100, "", "#8aff7d", "#d4ffd0", "vertical", "bottomToTop"),
+              sampleGaugeItem("Gauge_V_TB", 406, 86, 30, 160, 38, 100, "", "#c98aff", "#ecd6ff", "vertical", "topToBottom"),
+              sampleGaugeItem("Gauge_Circle_CW", 70, 288, 92, 92, 78, 100, "", "#ffd25a", "#fff0a8", "circle", "clockwise", 0),
+              sampleGaugeItem("Gauge_Circle_CCW", 220, 288, 92, 92, 40, 100, "", "#ff7ab8", "#ffd0e6", "circle", "counterClockwise", 0),
+              sampleTextItem("Gauge_Guide", 20, 412, "startAngle=0 が標準。必要に応じて direction と組み合わせて調整します。", 15, 620, { color: "#cfe0ff", zOrder: 50 })
             ])
           ]
         }
       },
       {
-        id: "tutorialStructure",
+        id: "sampleImageCompositeBasics",
         kind: "scene",
-        name: "Tutorial_01：シーン・グループ・ウィンドウの考え方",
+        name: "04_Image_Composite_Basics：image/compositeImage基礎",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Tutorial_01_Structure", name: "Tutorial_01_Structure", groupIds: ["tutorial_scene", "tutorial_groups", "tutorial_windows"], includeUngrouped: false },
+          scene: { id: "Image_Composite_Basics", name: "Image_Composite_Basics", groupIds: ["image_group"], includeUngrouped: false },
+          groups: [{ id: "image_group", name: "Image/Composite", visible: true, locked: false }],
+          windows: [
+            sampleWindowBase("Image_Composite_Window", "image_group", 72, 56, 676, 500, [
+              sampleTextItem("Image_Title", 20, 14, "image / compositeImage カテゴリ", 27, 620, { color: "#ffffff", zOrder: 10 }),
+              { type: "image", id: "Single_Image", x: 24, y: 78, width: 180, height: 120, folder: "pictures", fileName: "", scaleX: 1, scaleY: 1, scaleXPercent: 100, scaleYPercent: 100, opacity: 255, zOrder: 20, visible: true },
+              sampleTextItem("Single_Image_Guide", 24, 206, "image：単体画像。画像選択後に\n原寸ボタンで自然サイズへ戻せます。", 14, 260, { color: "#cfe0ff", zOrder: 21 }),
+              {
+                type: "compositeImage",
+                id: "Composite_Image",
+                x: 330,
+                y: 78,
+                width: 220,
+                height: 160,
+                scaleX: 1,
+                scaleY: 1,
+                scaleXPercent: 100,
+                scaleYPercent: 100,
+                opacity: 255,
+                selectedLayerIndex: 0,
+                selectedPresetId: "",
+                layers: [
+                  { id: "layer1", name: "レイヤー1", layerKind: "compositeImageLayer", visible: true, folder: "pictures", fileName: "", previewSrc: "", previewName: "", previewNaturalWidth: 0, previewNaturalHeight: 0, x: 0, y: 0, width: 220, height: 160, opacity: 255, priority: 1, blendMode: "normal" }
+                ],
+                zOrder: 30,
+                visible: true
+              },
+              sampleTextItem("Composite_Guide", 330, 250, "compositeImage：複数レイヤーを重ねるカテゴリ。\nPSD/名前ID連携のベースとして使えます。", 14, 320, { color: "#cfe0ff", zOrder: 31 })
+            ])
+          ]
+        }
+      },
+      {
+        id: "sampleButtonChoiceBasics",
+        kind: "scene",
+        name: "05_Button_Choice_Basics：button/choiceList/imageChoiceList",
+        savedAt: "sample",
+        version: TOOL_VERSION,
+        data: {
+          scene: { id: "Button_Choice_Basics", name: "Button_Choice_Basics", groupIds: ["menu_group"], includeUngrouped: false },
           groups: [
-            { id: "tutorial_scene", name: "1 シーン説明", visible: true, locked: false },
-            { id: "tutorial_groups", name: "2 グループ説明", visible: true, locked: false },
-            { id: "tutorial_windows", name: "3 ウィンドウ説明", visible: true, locked: false }
+            { id: "menu_group", name: "Menu Components", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Tutorial_Title_Window", "tutorial_scene", 34, 28, 748, 84, [
-              sampleTextItem("Tutorial_Title", 20, 12, "DB_UIComposer チュートリアル 01", 28, 420, { color: "#ffffff" }),
-              sampleTextItem("Tutorial_Sub", 22, 48, "まずは、シーン → グループ → ウィンドウ → パーツ の階層を確認するサンプルです。", 16, 690, { color: "#cfe0ff" })
-            ], { opacity: 210 }),
-            sampleWindowBase("Scene_Explain_Window", "tutorial_scene", 46, 132, 704, 118, [
-              sampleTextItem("Scene_H", 18, 12, "1. シーン", 24, 180, { color: "#ffe7a0" }),
-              sampleTextItem("Scene_Body", 22, 48, "シーンは画面全体の保存単位です。ステータス画面、戦闘HUD、ショップUIなどを、ひとつの完成画面として保存・読み込みできます。", 16, 650, { color: "#ffffff" })
-            ]),
-            sampleWindowBase("Group_Explain_Window", "tutorial_groups", 46, 270, 704, 126, [
-              sampleTextItem("Group_H", 18, 12, "2. グループ", 24, 180, { color: "#b8ffce" }),
-              sampleTextItem("Group_Body", 22, 48, "グループは複数のウィンドウやパーツをまとめる単位です。まとめて表示/非表示、ロック、保存、移動ができます。例：HP/MP欄、キャラ情報欄、説明ラベル群。", 16, 650, { color: "#ffffff" })
-            ]),
-            sampleWindowBase("Window_Explain_Window", "tutorial_windows", 46, 416, 704, 126, [
-              sampleTextItem("Window_H", 18, 12, "3. ウィンドウ", 24, 180, { color: "#b8d4ff" }),
-              sampleTextItem("Window_Body", 22, 48, "ウィンドウは枠・背景・配置範囲を持つ入れ物です。中にテキスト、画像、ゲージ、ログ、ボタンなどのパーツを置きます。", 16, 650, { color: "#ffffff" })
+            sampleWindowBase("Button_Choice_Window", "menu_group", 70, 56, 680, 500, [
+              sampleTextItem("Menu_Title", 20, 14, "button / choiceList / imageChoiceList", 27, 620, { color: "#ffffff", zOrder: 10 }),
+              { type: "button", id: "Normal_Button", x: 28, y: 72, width: 180, height: 42, text: "通常ボタン", buttonVisualMode: "normal", zOrder: 20, visible: true },
+              { type: "button", id: "Image_Button", x: 232, y: 72, width: 200, height: 42, text: "画像ボタン（未設定）", buttonVisualMode: "image", zOrder: 21, visible: true },
+              {
+                type: "choiceList",
+                id: "Choice_List",
+                x: 28,
+                y: 146,
+                choiceMode: "tool",
+                width: 220,
+                rowHeight: 32,
+                maxVisibleRows: 5,
+                choices: ["探索", "休憩", "戻る"],
+                choiceRules: [
+                  { text: "探索", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" },
+                  { text: "休憩", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" },
+                  { text: "戻る", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" }
+                ],
+                autoResizeWindow: true,
+                normalBackColor: "rgba(255,255,255,.10)",
+                hoverBackColor: "rgba(255,255,255,.22)",
+                selectedBackColor: "rgba(98,169,255,.35)",
+                disabledBackColor: "rgba(0,0,0,.28)",
+                disabledTextColor: "rgba(180,180,180,.85)",
+                borderColor: "rgba(255,255,255,.35)",
+                textColor: "",
+                fontSize: 18,
+                align: "center",
+                closeWindowOnSelect: false,
+                choiceEnabled: [true, true, true],
+                disabledIndexes: "",
+                resultVariableId: 0,
+                commonEventId: 0,
+                script: "",
+                zOrder: 30,
+                visible: true
+              },
+              {
+                type: "imageChoiceList",
+                id: "Image_Choice_List",
+                x: 320,
+                y: 152,
+                width: 180,
+                height: 110,
+                selectedOptionIndex: 0,
+                closeWindowOnSelect: false,
+                options: [createDefaultImageChoiceOption(0), createDefaultImageChoiceOption(1)],
+                zOrder: 31,
+                visible: true
+              },
+              sampleTextItem("Menu_Guide", 20, 410, "buttonは単発操作、choiceListは文字選択、imageChoiceListは画像選択向け。", 15, 620, { color: "#cfe0ff", zOrder: 60 })
             ])
-          ]
-        }
-      },
-      {
-        id: "tutorialParts",
-        kind: "scene",
-        name: "Tutorial_02：パーツ種類とプロパティ確認",
-        savedAt: "sample",
-        version: TOOL_VERSION,
-        data: {
-          scene: { id: "Tutorial_02_Parts", name: "Tutorial_02_Parts", groupIds: ["tutorial_parts"], includeUngrouped: false },
-          groups: [{ id: "tutorial_parts", name: "パーツ説明", visible: true, locked: false }],
-          windows: [
-            sampleWindowBase("Parts_Explain_Window", "tutorial_parts", 38, 34, 742, 514, [
-              sampleTextItem("Parts_Title", 20, 12, "パーツの基本", 28, 300, { color: "#ffffff" }),
-              sampleTextItem("Text_Label", 30, 70, "テキスト：名前、説明、数値表示に使います。色、サイズ、幅、揃えを調整できます。", 16, 640, { color: "#ffffff" }),
-              sampleTextItem("Image_Label", 30, 114, "画像：立ち絵、アイコン、装飾などに使います。画像ボタンやPSDボタンの土台にもなります。", 16, 640, { color: "#ffffff" }),
-              sampleTextItem("Gauge_Label", 30, 158, "ゲージ：横・縦・円に対応。値タイプを変数/固定/アクターHPなどにできます。", 16, 640, { color: "#ffffff" }),
-              sampleGaugeItem("Tutorial_HP_Gauge", 54, 204, 260, 18, 80, 100, "", "#ff6060", "#ffb0b0", "horizontal", "leftToRight"),
-              sampleGaugeItem("Tutorial_V_Gauge", 364, 196, 28, 86, 55, 100, "", "#66ccff", "#d0f1ff", "vertical", "bottomToTop"),
-              sampleGaugeItem("Tutorial_C_Gauge", 448, 196, 86, 86, 45, 100, "", "#ffd25a", "#fff0a8", "circle", "clockwise"),
-              { type: "log", id: "Tutorial_Log", x: 54, y: 318, width: 520, height: 92, fontSize: 16, lineHeight: 24, color: "#ffffff", paddingX: 8, paddingY: 8, maxLines: 3, lineVisibleFrames: 180, fadeFrames: 30, moveFrames: 20, sampleText: "ログパーツです。\n1行ごとの表示時間を設定できます。", zOrder: 0, visible: true },
-              sampleTextItem("Parts_Guide", 30, 440, "右側プロパティを見ながら、各パーツの値を変更してみてください。左一覧の保存アイコンで部品化できます。", 16, 660, { color: "#cfe0ff" })
-            ])
-          ]
-        }
-      },
-      {
-        id: "tutorialReuse",
-        kind: "scene",
-        name: "Tutorial_03：保存・読込・再利用の流れ",
-        savedAt: "sample",
-        version: TOOL_VERSION,
-        data: {
-          scene: { id: "Tutorial_03_Reuse", name: "Tutorial_03_Reuse", groupIds: ["tutorial_reuse", "tutorial_save_targets"], includeUngrouped: false },
-          groups: [
-            { id: "tutorial_reuse", name: "保存読込の説明", visible: true, locked: false },
-            { id: "tutorial_save_targets", name: "保存して試す部品", visible: true, locked: false }
-          ],
-          windows: [
-            sampleWindowBase("Reuse_Guide_Window", "tutorial_reuse", 38, 40, 742, 206, [
-              sampleTextItem("Reuse_Title", 20, 12, "保存・読込チュートリアル", 28, 380, { color: "#ffffff" }),
-              sampleTextItem("Reuse_1", 24, 62, "1. 一覧の右端にある保存アイコンで、シーン/グループ/ウィンドウ/パーツをファイル保存できます。", 16, 680, { color: "#ffffff" }),
-              sampleTextItem("Reuse_2", 24, 96, "2. 読み込みアイコンは『追加』として働きます。既存レイアウトを壊さず、部品を現在の画面へ足せます。", 16, 680, { color: "#ffffff" }),
-              sampleTextItem("Reuse_3", 24, 130, "3. 読み込み時はID重複を避けるため、自動でコピーIDが付与されます。", 16, 680, { color: "#ffffff" })
-            ]),
-            sampleWindowBase("Reusable_Status_Block", "tutorial_save_targets", 76, 286, 304, 170, [
-              sampleTextItem("Reusable_Name", 18, 14, "再利用用ステータス部品", 20, 230, { color: "#ffffff" }),
-              sampleTextItem("Reusable_Hp_Label", 20, 62, "HP", 16, 40, { color: "#ffc0c0" }),
-              sampleGaugeItem("Reusable_Hp", 64, 66, 190, 14, 62, 100, "", "#ff6060", "#ffb0b0", "horizontal", "leftToRight"),
-              sampleTextItem("Reusable_Note", 20, 104, "このウィンドウやグループを保存して、別画面で読み込んでみてください。", 14, 250, { color: "#cfe0ff" })
-            ], { opacity: 220 }),
-            sampleWindowBase("Reusable_Button_Block", "tutorial_save_targets", 428, 286, 256, 170, [
-              sampleTextItem("Reusable_Button_Title", 18, 16, "ボタン部品の土台", 20, 200, { color: "#ffffff" }),
-              { type: "button", id: "Reusable_Button", x: 34, y: 70, width: 156, height: 42, text: "OK", buttonType: "normal", zOrder: 0, visible: true },
-              sampleTextItem("Reusable_Button_Note", 20, 124, "画像ボタン/PSDボタンに変更して使えます。", 14, 210, { color: "#cfe0ff" })
-            ], { opacity: 220 })
           ]
         }
       }

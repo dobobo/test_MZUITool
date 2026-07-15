@@ -1,0 +1,48 @@
+{
+  "id": "sampleChoiceListBasic",
+  "kind": "item",
+  "name": "Choice List Basic（文字選択肢）",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "sourceWindowId": "Button_Choice_Window",
+    "item": {
+      "type": "choiceList",
+      "id": "Choice_List_Basic",
+      "x": 24,
+      "y": 130,
+      "choiceMode": "tool",
+      "width": 220,
+      "rowHeight": 32,
+      "maxVisibleRows": 5,
+      "choices": [
+        "開始",
+        "設定",
+        "終了"
+      ],
+      "choiceRules": [
+        { "text": "開始", "conditionType": "always", "trueState": "enabled", "falseState": "hidden", "switchId": 0, "variableId": 0, "compareValue": 0, "script": "" },
+        { "text": "設定", "conditionType": "always", "trueState": "enabled", "falseState": "hidden", "switchId": 0, "variableId": 0, "compareValue": 0, "script": "" },
+        { "text": "終了", "conditionType": "always", "trueState": "enabled", "falseState": "hidden", "switchId": 0, "variableId": 0, "compareValue": 0, "script": "" }
+      ],
+      "autoResizeWindow": true,
+      "normalBackColor": "rgba(255,255,255,.10)",
+      "hoverBackColor": "rgba(255,255,255,.22)",
+      "selectedBackColor": "rgba(98,169,255,.35)",
+      "disabledBackColor": "rgba(0,0,0,.28)",
+      "disabledTextColor": "rgba(180,180,180,.85)",
+      "borderColor": "rgba(255,255,255,.35)",
+      "textColor": "",
+      "fontSize": 18,
+      "align": "center",
+      "closeWindowOnSelect": false,
+      "choiceEnabled": [true, true, true],
+      "disabledIndexes": "",
+      "resultVariableId": 0,
+      "commonEventId": 0,
+      "script": "",
+      "zOrder": 0,
+      "visible": true
+    }
+  }
+}

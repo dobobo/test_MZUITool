@@ -1,0 +1,30 @@
+{
+  "id": "sampleLogBlockBasic",
+  "kind": "item",
+  "name": "Log Block Basic（ログ最小）",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "sourceWindowId": "Text_Log_Window",
+    "item": {
+      "type": "log",
+      "id": "Log_Block_Basic",
+      "x": 24,
+      "y": 120,
+      "width": 440,
+      "height": 150,
+      "fontSize": 18,
+      "lineHeight": 30,
+      "color": "#ffffff",
+      "paddingX": 8,
+      "paddingY": 8,
+      "maxLines": 4,
+      "displayFrames": 180,
+      "fadeFrames": 30,
+      "moveFrames": 20,
+      "sampleText": "ログA\nログB\nログC",
+      "zOrder": 0,
+      "visible": true
+    }
+  }
+}

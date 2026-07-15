@@ -1,0 +1,86 @@
+{
+  "id": "sampleGaugeComparisonGroup",
+  "kind": "group",
+  "name": "Gauge Comparison Group（横/縦/円）",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "group": {
+      "id": "gauge_compare_group",
+      "name": "Gauge Compare",
+      "visible": true,
+      "locked": false
+    },
+    "windows": [
+      {
+        "id": "Gauge_Compare_Window",
+        "groupId": "gauge_compare_group",
+        "x": 80,
+        "y": 80,
+        "width": 560,
+        "height": 300,
+        "opacity": 220,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 0,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "gauge",
+            "id": "H_Gauge",
+            "x": 20,
+            "y": 26,
+            "width": 220,
+            "height": 18,
+            "gaugeShape": "horizontal",
+            "gaugeDirection": "leftToRight",
+            "valueType": "fixed",
+            "value": 66,
+            "max": 100,
+            "color1": "#66ccff",
+            "color2": "#d0f1ff",
+            "zOrder": 10,
+            "visible": true
+          },
+          {
+            "type": "gauge",
+            "id": "V_Gauge",
+            "x": 300,
+            "y": 26,
+            "width": 28,
+            "height": 150,
+            "gaugeShape": "vertical",
+            "gaugeDirection": "bottomToTop",
+            "valueType": "fixed",
+            "value": 52,
+            "max": 100,
+            "color1": "#8aff7d",
+            "color2": "#d4ffd0",
+            "zOrder": 11,
+            "visible": true
+          },
+          {
+            "type": "gauge",
+            "id": "C_Gauge",
+            "x": 420,
+            "y": 26,
+            "width": 84,
+            "height": 84,
+            "gaugeShape": "circle",
+            "gaugeDirection": "clockwise",
+            "gaugeStartAngle": 0,
+            "valueType": "fixed",
+            "value": 74,
+            "max": 100,
+            "color1": "#ffd25a",
+            "color2": "#fff0a8",
+            "zOrder": 12,
+            "visible": true
+          }
+        ]
+      }
+    ]
+  }
+}

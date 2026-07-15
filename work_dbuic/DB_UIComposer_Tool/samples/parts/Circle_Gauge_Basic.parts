@@ -1,0 +1,29 @@
+{
+  "id": "sampleCircleGaugeBasic",
+  "kind": "item",
+  "name": "Circle Gauge Basic（円ゲージ最小）",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "sourceWindowId": "Gauge_Window",
+    "item": {
+      "type": "gauge",
+      "id": "Circle_Gauge_Basic",
+      "x": 120,
+      "y": 120,
+      "width": 84,
+      "height": 84,
+      "gaugeShape": "circle",
+      "gaugeDirection": "clockwise",
+      "gaugeStartAngle": 0,
+      "valueType": "fixed",
+      "value": 62,
+      "max": 100,
+      "label": "",
+      "color1": "#ffd15a",
+      "color2": "#fff0a8",
+      "zOrder": 0,
+      "visible": true
+    }
+  }
+}

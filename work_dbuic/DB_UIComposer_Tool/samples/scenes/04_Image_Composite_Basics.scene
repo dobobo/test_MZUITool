@@ -1,0 +1,133 @@
+{
+  "id": "sampleImageCompositeBasics",
+  "kind": "scene",
+  "name": "04_Image_Composite_Basics：image/compositeImage基礎",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "scene": {
+      "id": "Image_Composite_Basics",
+      "name": "Image_Composite_Basics",
+      "groupIds": [
+        "image_group"
+      ],
+      "includeUngrouped": false
+    },
+    "groups": [
+      { "id": "image_group", "name": "Image/Composite", "visible": true, "locked": false }
+    ],
+    "windows": [
+      {
+        "id": "Image_Composite_Window",
+        "groupId": "image_group",
+        "x": 72,
+        "y": 56,
+        "width": 676,
+        "height": 500,
+        "opacity": 220,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 0,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "text",
+            "id": "Image_Title",
+            "x": 20,
+            "y": 14,
+            "width": 620,
+            "text": "image / compositeImage カテゴリ",
+            "fontSize": 27,
+            "color": "#ffffff",
+            "align": "left",
+            "zOrder": 10,
+            "visible": true
+          },
+          {
+            "type": "image",
+            "id": "Single_Image",
+            "x": 24,
+            "y": 78,
+            "width": 180,
+            "height": 120,
+            "folder": "pictures",
+            "fileName": "",
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleXPercent": 100,
+            "scaleYPercent": 100,
+            "opacity": 255,
+            "zOrder": 20,
+            "visible": true
+          },
+          {
+            "type": "text",
+            "id": "Single_Image_Guide",
+            "x": 24,
+            "y": 206,
+            "width": 260,
+            "text": "image：単体画像。画像選択後に\n原寸ボタンで自然サイズへ戻せます。",
+            "fontSize": 14,
+            "color": "#cfe0ff",
+            "align": "left",
+            "zOrder": 21,
+            "visible": true
+          },
+          {
+            "type": "compositeImage",
+            "id": "Composite_Image",
+            "x": 330,
+            "y": 78,
+            "width": 220,
+            "height": 160,
+            "scaleX": 1,
+            "scaleY": 1,
+            "scaleXPercent": 100,
+            "scaleYPercent": 100,
+            "opacity": 255,
+            "selectedLayerIndex": 0,
+            "selectedPresetId": "",
+            "layers": [
+              {
+                "id": "layer1",
+                "name": "レイヤー1",
+                "layerKind": "compositeImageLayer",
+                "visible": true,
+                "folder": "pictures",
+                "fileName": "",
+                "previewSrc": "",
+                "previewName": "",
+                "previewNaturalWidth": 0,
+                "previewNaturalHeight": 0,
+                "x": 0,
+                "y": 0,
+                "width": 220,
+                "height": 160,
+                "opacity": 255,
+                "priority": 1,
+                "blendMode": "normal"
+              }
+            ],
+            "zOrder": 30,
+            "visible": true
+          },
+          {
+            "type": "text",
+            "id": "Composite_Guide",
+            "x": 330,
+            "y": 250,
+            "width": 320,
+            "text": "compositeImage：複数レイヤーを重ねるカテゴリ。\nPSD/名前ID連携のベースとして使えます。",
+            "fontSize": 14,
+            "color": "#cfe0ff",
+            "align": "left",
+            "zOrder": 31,
+            "visible": true
+          }
+        ]
+      }
+    ]
+  }
+}

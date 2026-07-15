@@ -1,0 +1,59 @@
+{
+  "id": "sampleTextLogWindow",
+  "kind": "window",
+  "name": "Text Log Tutorial Window（text/log）",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "window": {
+      "id": "Text_Log_Tutorial_Window",
+      "groupId": "textlog_group",
+      "x": 80,
+      "y": 80,
+      "width": 620,
+      "height": 360,
+      "opacity": 220,
+      "contentsOpacity": 255,
+      "layer": "mapUi",
+      "zOrder": 0,
+      "visible": true,
+      "frameVisible": true,
+      "backgroundType": "normal",
+      "items": [
+        {
+          "type": "text",
+          "id": "Window_Text_Title",
+          "x": 18,
+          "y": 14,
+          "width": 500,
+          "text": "text と log の調整用ウィンドウ",
+          "fontSize": 24,
+          "color": "#ffffff",
+          "align": "left",
+          "zOrder": 10,
+          "visible": true
+        },
+        {
+          "type": "log",
+          "id": "Window_Log",
+          "x": 18,
+          "y": 68,
+          "width": 560,
+          "height": 240,
+          "fontSize": 18,
+          "lineHeight": 30,
+          "color": "#ffffff",
+          "paddingX": 8,
+          "paddingY": 8,
+          "maxLines": 5,
+          "displayFrames": 180,
+          "fadeFrames": 30,
+          "moveFrames": 20,
+          "sampleText": "ログ1\nログ2\nログ3",
+          "zOrder": 20,
+          "visible": true
+        }
+      ]
+    }
+  }
+}
