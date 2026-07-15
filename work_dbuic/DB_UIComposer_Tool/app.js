@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.24";
+  const TOOL_VERSION = "0.4.25";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -11368,39 +11368,40 @@ ${choiceRuleStructComment()}
 
   // 現在フォーカス中のウィンドウまたはパーツを削除します。
   // 削除直後でも Ctrl+Z で復元できるため、キーボード操作時は確認ダイアログを出しません。
-  function deleteSelectedObject() {
+  function deleteSelectedObject(options = {}) {
+    const silent = options?.silent === true;
     if (!selected) {
-      showToast("削除するウィンドウまたはパーツを選択してください");
+      if (!silent) showToast("削除するウィンドウまたはパーツを選択してください");
       return false;
     }
     if (selected.kind === "group") {
       const group = selectedGroup();
       if (!group) {
-        showToast("選択中のグループが見つかりません");
+        if (!silent) showToast("選択中のグループが見つかりません");
         return false;
       }
       deleteGroup(group.id);
-      showToast("グループと所属ウィンドウを削除しました（Ctrl+Zで復元）");
+      if (!silent) showToast("グループと所属ウィンドウを削除しました（Ctrl+Zで復元）");
       return true;
     }
     if (selected.kind === "window") {
       const win = selectedWindow();
       if (!win) {
-        showToast("選択中のウィンドウが見つかりません");
+        if (!silent) showToast("選択中のウィンドウが見つかりません");
         return false;
       }
       deleteWindow(win.id);
-      showToast("ウィンドウを削除しました（Ctrl+Zで復元）");
+      if (!silent) showToast("ウィンドウを削除しました（Ctrl+Zで復元）");
       return true;
     }
     const win = selectedWindow();
     const item = selectedItem();
     if (!win || !item) {
-      showToast("選択中のパーツが見つかりません");
+      if (!silent) showToast("選択中のパーツが見つかりません");
       return false;
     }
     deleteItem(win.id, item.id);
-    showToast("パーツを削除しました（Ctrl+Zで復元）");
+    if (!silent) showToast("パーツを削除しました（Ctrl+Zで復元）");
     return true;
   }
 
@@ -11564,10 +11565,11 @@ ${choiceRuleStructComment()}
     showToast("パーツを複製しました");
   }
 
-  function copyGroupToClipboard(groupId) {
+  function copyGroupToClipboard(groupId, options = {}) {
+    const silent = options?.silent === true;
     const group = groupById(groupId || "");
     if (!group) {
-      showToast("コピーするグループが見つかりません");
+      if (!silent) showToast("コピーするグループが見つかりません");
       return false;
     }
     objectClipboard = {
@@ -11578,24 +11580,25 @@ ${choiceRuleStructComment()}
       }
     };
     syncDetachedObjectListWindow();
-    showToast("グループをコピーしました");
+    if (!silent) showToast("グループをコピーしました");
     return true;
   }
 
-  function copySelectedObject() {
+  function copySelectedObject(options = {}) {
+    const silent = options?.silent === true;
     if (!selected) {
-      showToast("コピーするウィンドウ、グループ、またはパーツを選択してください");
+      if (!silent) showToast("コピーするウィンドウ、グループ、またはパーツを選択してください");
       return false;
     }
     if (selected.kind === "group") {
-      return copyGroupToClipboard(selected.groupId);
+      return copyGroupToClipboard(selected.groupId, { silent });
     }
     if (selected.kind === "window") {
       const win = selectedWindow();
       if (!win) return false;
       objectClipboard = { kind: "window", data: cloneForHistory(win) };
       syncDetachedObjectListWindow();
-      showToast("ウィンドウをコピーしました");
+      if (!silent) showToast("ウィンドウをコピーしました");
       return true;
     }
     const win = selectedWindow();
@@ -11603,7 +11606,20 @@ ${choiceRuleStructComment()}
     if (!win || !item) return false;
     objectClipboard = { kind: "item", sourceWindowId: win.id, data: cloneForHistory(item) };
     syncDetachedObjectListWindow();
-    showToast("パーツをコピーしました");
+    if (!silent) showToast("パーツをコピーしました");
+    return true;
+  }
+
+  function cutSelectedObject() {
+    if (!selected) {
+      showToast("切り取りするウィンドウ、グループ、またはパーツを選択してください");
+      return false;
+    }
+    const copied = copySelectedObject({ silent: true });
+    if (!copied) return false;
+    const cut = deleteSelectedObject({ silent: true });
+    if (!cut) return false;
+    showToast("切り取りしました（Ctrl+Vで貼り付け / Ctrl+Zで戻せます）");
     return true;
   }
 
@@ -13947,6 +13963,9 @@ ${e?.message || String(e)}`);
       case "copy":
         copySelectedObject();
         return;
+      case "cut":
+        cutSelectedObject();
+        return;
       case "template:save":
         saveObjectTemplate(target || selected);
         return;
@@ -14369,6 +14388,11 @@ ${e?.message || String(e)}`);
     if (key === "c") {
       ev.preventDefault();
       copySelectedObject();
+      return;
+    }
+    if (key === "x") {
+      ev.preventDefault();
+      cutSelectedObject();
       return;
     }
     if (key === "v") {
