@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.33";
+  const TOOL_VERSION = "0.4.34";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -7795,6 +7795,7 @@ ${choiceRuleStructComment()}
   function addTopIdentityInputs(entries) {
     const row = document.createElement("div");
     row.className = "property-top-identity";
+    if ((entries?.length || 0) <= 1) row.classList.add("single");
     for (const entry of entries) {
       const label = document.createElement("label");
       label.className = "property-top-identity-field";
@@ -7806,9 +7807,12 @@ ${choiceRuleStructComment()}
       input.type = "text";
       input.value = String(entry.value ?? "");
       input.placeholder = entry.placeholder || "";
-      input.addEventListener("change", () => {
-        runPropertyValueMutation(`${entry.label}変更`, () => entry.onChange(input.value));
-      });
+      input.disabled = entry.readonly === true;
+      if (typeof entry.onChange === "function" && entry.readonly !== true) {
+        input.addEventListener("change", () => {
+          runPropertyValueMutation(`${entry.label}変更`, () => entry.onChange(input.value));
+        });
+      }
       label.appendChild(title);
       label.appendChild(input);
       row.appendChild(label);
@@ -7873,12 +7877,21 @@ ${choiceRuleStructComment()}
       { text: "削除", className: "danger", onClick: () => deleteGroup(group.id), help: "グループを削除し、所属ウィンドウも一緒に削除します。" }
     ]);
 
-    addPropertyDivider("基本");
-    addReadonly("グループID", group.id);
-    addTextInput("グループ名", group.name || group.id, value => {
-      const target = groupById(group.id);
-      if (target) target.name = String(value || target.id).trim() || target.id;
-    });
+    addTopIdentityInputs([
+      {
+        label: "グループ名",
+        value: group.name || group.id,
+        onChange: value => {
+          const target = groupById(group.id);
+          if (target) target.name = String(value || target.id).trim() || target.id;
+        }
+      },
+      {
+        label: "グループID",
+        value: group.id,
+        readonly: true
+      }
+    ]);
     addReadonly("所属ウィンドウ数", `${bounds.count}`);
 
     addPropertyDivider("配置・サイズ");
@@ -7906,12 +7919,17 @@ ${choiceRuleStructComment()}
       { text: "削除", className: "danger", onClick: () => deleteSelectedObject(), help: "選択中のウィンドウを削除します。Ctrl+Zで戻せます。" }
     ]);
 
-    addPropertyDivider("基本");
-    addTextInput("ID", win.id, value => {
-      const old = win.id;
-      win.id = safeWindowIdInState(value, old, win);
-      if (selected?.windowId === old) selected.windowId = win.id;
-    });
+    addTopIdentityInputs([
+      {
+        label: "ウィンドウID",
+        value: win.id,
+        onChange: value => {
+          const old = win.id;
+          win.id = safeWindowIdInState(value, old, win);
+          if (selected?.windowId === old) selected.windowId = win.id;
+        }
+      }
+    ]);
     addSelect("レイヤー", win.layer || "mapUi", [
       { value: "mapUi", label: "mapUi：通常UI" },
       { value: "messageAbove", label: "messageAbove：メッセージより前" },
@@ -8029,7 +8047,6 @@ ${choiceRuleStructComment()}
       }
     ]);
 
-    addPropertyDivider("基本");
     addInfo("前後順は一覧の上下順で決まります。上にあるほど手前に表示されます。");
 
     addPropertyDivider("配置・サイズ");

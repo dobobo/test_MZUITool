@@ -1998,6 +1998,10 @@ body.panel-resizing * {
   margin: 0 0 10px;
 }
 
+.property-top-identity.single {
+  grid-template-columns: 1fr;
+}
+
 .property-top-identity-field {
   display: block;
   margin: 0;
