@@ -32,8 +32,14 @@ type MyMainWindow struct {
 }
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			walk.MsgBox(nil, "起動エラー", fmt.Sprintf("予期しないエラーで終了しました:\n%v", r), walk.MsgBoxIconError)
+		}
+	}()
+
 	mw := &MyMainWindow{}
-	mw.dir, _ = os.Getwd()
+	mw.dir = appDir()
 
 	exportDir := readOptionalFile(filepath.Join(mw.dir, "export_dir.txt"))
 	importDir := readOptionalFile(filepath.Join(mw.dir, "import_dir.txt"))
@@ -77,15 +83,27 @@ func main() {
 		},
 	}
 	if _, err := MW.Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		walk.MsgBox(nil, "起動エラー", err.Error(), walk.MsgBoxIconError)
 		os.Exit(1)
 	}
+}
+
+// appDir は exe のあるフォルダを返します（ダブルクリック起動でも cwd に依存しない）。
+func appDir() string {
+	exe, err := os.Executable()
+	if err == nil {
+		if resolved, err2 := filepath.EvalSymlinks(exe); err2 == nil {
+			exe = resolved
+		}
+		return filepath.Dir(exe)
+	}
+	wd, _ := os.Getwd()
+	return wd
 }
 
 func readOptionalFile(path string) []byte {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		fmt.Println(err)
 		return nil
 	}
 	return b

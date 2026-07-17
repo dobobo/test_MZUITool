@@ -4,13 +4,8 @@
 
 RPGツクールMZ 用の翻訳文章差し替えアプリです。
 
-- 元データ: `gui_jsonTEST.zip`
 - **修正済み一括ダウンロード（exe 同梱）**: [`gui_jsonTEST_fixed.zip`](gui_jsonTEST_fixed.zip)
-- 修正済みソース: [`gui_jsonTEST/`](gui_jsonTEST/)
-  - `gui_json.exe` … 64bit Windows
-  - `gui_json_x86.exe` … 32bit Windows
+- 通常は展開後に `gui_json.exe` を起動
+- 起動しない場合は **新しいフォルダへ展開し直し**、だめなら `gui_json_console.exe` でエラー確認
 
-```bash
-cd gui_jsonTEST
-go test ./internal/replace -v
-```
+以前の exe は Common Controls マニフェスト未埋め込みのため、ウィンドウが出ないことがありました。現在の ZIP では埋め込み済みです。
