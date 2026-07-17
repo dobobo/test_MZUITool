@@ -1,0 +1,209 @@
+{
+  "id": "sampleButtonChoiceBasics",
+  "kind": "scene",
+  "name": "05_Button_Choice_Basics：button/choiceList/imageChoiceList",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "scene": {
+      "id": "Button_Choice_Basics",
+      "name": "Button_Choice_Basics",
+      "groupIds": [
+        "menu_group"
+      ],
+      "includeUngrouped": false
+    },
+    "groups": [
+      { "id": "menu_group", "name": "Menu Components", "visible": true, "locked": false }
+    ],
+    "windows": [
+      {
+        "id": "Button_Choice_Window",
+        "groupId": "menu_group",
+        "x": 70,
+        "y": 56,
+        "width": 680,
+        "height": 500,
+        "opacity": 220,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 0,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "text",
+            "id": "Menu_Title",
+            "x": 20,
+            "y": 14,
+            "width": 620,
+            "text": "button / choiceList / imageChoiceList",
+            "fontSize": 27,
+            "color": "#ffffff",
+            "align": "left",
+            "zOrder": 10,
+            "visible": true
+          },
+          {
+            "type": "button",
+            "id": "Normal_Button",
+            "x": 28,
+            "y": 72,
+            "width": 180,
+            "height": 42,
+            "text": "通常ボタン",
+            "buttonVisualMode": "normal",
+            "commonEventId": 0,
+            "switchId": 0,
+            "variableId": 0,
+            "variableValue": 0,
+            "script": "",
+            "zOrder": 20,
+            "visible": true
+          },
+          {
+            "type": "button",
+            "id": "Image_Button",
+            "x": 232,
+            "y": 72,
+            "width": 200,
+            "height": 42,
+            "text": "画像ボタン（未設定）",
+            "buttonVisualMode": "image",
+            "buttonStateEdit": "mouseOn",
+            "buttonStates": {
+              "mouseOff": { "enabled": false },
+              "mouseOn": { "enabled": false },
+              "press": { "enabled": false },
+              "release": { "enabled": false }
+            },
+            "buttonImages": {
+              "mouseOff": { "folder": "pictures", "fileName": "", "opacity": 255, "previewSrc": "", "previewName": "" },
+              "mouseOn": { "folder": "pictures", "fileName": "", "opacity": 255, "previewSrc": "", "previewName": "" },
+              "press": { "folder": "pictures", "fileName": "", "opacity": 255, "previewSrc": "", "previewName": "" },
+              "release": { "folder": "pictures", "fileName": "", "opacity": 255, "previewSrc": "", "previewName": "" }
+            },
+            "zOrder": 21,
+            "visible": true
+          },
+          {
+            "type": "choiceList",
+            "id": "Choice_List",
+            "x": 28,
+            "y": 146,
+            "choiceMode": "tool",
+            "width": 220,
+            "rowHeight": 32,
+            "maxVisibleRows": 5,
+            "choices": ["探索", "休憩", "戻る"],
+            "choiceRules": [
+              { "text": "探索", "conditionType": "always", "trueState": "enabled", "falseState": "hidden", "switchId": 0, "variableId": 0, "compareValue": 0, "script": "" },
+              { "text": "休憩", "conditionType": "always", "trueState": "enabled", "falseState": "hidden", "switchId": 0, "variableId": 0, "compareValue": 0, "script": "" },
+              { "text": "戻る", "conditionType": "always", "trueState": "enabled", "falseState": "hidden", "switchId": 0, "variableId": 0, "compareValue": 0, "script": "" }
+            ],
+            "autoResizeWindow": true,
+            "normalBackColor": "rgba(255,255,255,.10)",
+            "hoverBackColor": "rgba(255,255,255,.22)",
+            "selectedBackColor": "rgba(98,169,255,.35)",
+            "disabledBackColor": "rgba(0,0,0,.28)",
+            "disabledTextColor": "rgba(180,180,180,.85)",
+            "borderColor": "rgba(255,255,255,.35)",
+            "textColor": "",
+            "fontSize": 18,
+            "align": "center",
+            "closeWindowOnSelect": false,
+            "choiceEnabled": [true, true, true],
+            "disabledIndexes": "",
+            "resultVariableId": 0,
+            "commonEventId": 0,
+            "script": "",
+            "zOrder": 30,
+            "visible": true
+          },
+          {
+            "type": "imageChoiceList",
+            "id": "Image_Choice_List",
+            "x": 320,
+            "y": 152,
+            "width": 180,
+            "height": 110,
+            "selectedOptionIndex": 0,
+            "closeWindowOnSelect": false,
+            "options": [
+              {
+                "id": "choice1",
+                "text": "選択肢1",
+                "x": 0,
+                "y": 0,
+                "width": 160,
+                "height": 44,
+                "enabledImage": { "folder": "pictures", "fileName": "", "previewSrc": "", "previewName": "", "opacity": 255, "mode": "stretch" },
+                "disabledImage": { "folder": "pictures", "fileName": "", "previewSrc": "", "previewName": "", "opacity": 255, "mode": "stretch" },
+                "hoverImage": { "folder": "pictures", "fileName": "", "previewSrc": "", "previewName": "", "opacity": 255, "mode": "stretch" },
+                "pressImage": { "folder": "pictures", "fileName": "", "previewSrc": "", "previewName": "", "opacity": 255, "mode": "stretch" },
+                "conditionType": "always",
+                "switchId": 0,
+                "variableId": 0,
+                "compareValue": 0,
+                "script": "",
+                "trueState": "enabled",
+                "falseState": "disabled",
+                "previewCondition": true,
+                "hoverScalePercent": 105,
+                "hoverOpacity": 255,
+                "pressScalePercent": 96,
+                "pressOpacity": 230,
+                "resultVariableId": 0,
+                "commonEventId": 0,
+                "scriptOnSelect": ""
+              },
+              {
+                "id": "choice2",
+                "text": "選択肢2",
+                "x": 0,
+                "y": 52,
+                "width": 160,
+                "height": 44,
+                "enabledImage": { "folder": "pictures", "fileName": "", "previewSrc": "", "previewName": "", "opacity": 255, "mode": "stretch" },
+                "disabledImage": { "folder": "pictures", "fileName": "", "previewSrc": "", "previewName": "", "opacity": 255, "mode": "stretch" },
+                "hoverImage": { "folder": "pictures", "fileName": "", "previewSrc": "", "previewName": "", "opacity": 255, "mode": "stretch" },
+                "pressImage": { "folder": "pictures", "fileName": "", "previewSrc": "", "previewName": "", "opacity": 255, "mode": "stretch" },
+                "conditionType": "always",
+                "switchId": 0,
+                "variableId": 0,
+                "compareValue": 0,
+                "script": "",
+                "trueState": "enabled",
+                "falseState": "disabled",
+                "previewCondition": true,
+                "hoverScalePercent": 105,
+                "hoverOpacity": 255,
+                "pressScalePercent": 96,
+                "pressOpacity": 230,
+                "resultVariableId": 0,
+                "commonEventId": 0,
+                "scriptOnSelect": ""
+              }
+            ],
+            "zOrder": 31,
+            "visible": true
+          },
+          {
+            "type": "text",
+            "id": "Menu_Guide",
+            "x": 20,
+            "y": 410,
+            "width": 620,
+            "text": "buttonは単発操作、choiceListは文字選択、imageChoiceListは画像選択向け。",
+            "fontSize": 15,
+            "color": "#cfe0ff",
+            "align": "left",
+            "zOrder": 60,
+            "visible": true
+          }
+        ]
+      }
+    ]
+  }
+}

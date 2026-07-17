@@ -1,0 +1,169 @@
+{
+  "id": "sampleGaugeDirections",
+  "kind": "scene",
+  "name": "03_Gauge_Directions：横/縦/円ゲージ比較",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "scene": {
+      "id": "Gauge_Directions",
+      "name": "Gauge_Directions",
+      "groupIds": [
+        "gauge_group"
+      ],
+      "includeUngrouped": false
+    },
+    "groups": [
+      { "id": "gauge_group", "name": "Gauge", "visible": true, "locked": false }
+    ],
+    "windows": [
+      {
+        "id": "Gauge_Window",
+        "groupId": "gauge_group",
+        "x": 70,
+        "y": 54,
+        "width": 680,
+        "height": 500,
+        "opacity": 220,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 0,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "text",
+            "id": "Gauge_Title",
+            "x": 20,
+            "y": 12,
+            "width": 520,
+            "text": "gaugeカテゴリ：方向・形状・開始角度",
+            "fontSize": 27,
+            "color": "#ffffff",
+            "align": "left",
+            "zOrder": 10,
+            "visible": true
+          },
+          {
+            "type": "gauge",
+            "id": "Gauge_H_LR",
+            "x": 30,
+            "y": 86,
+            "width": 260,
+            "height": 18,
+            "gaugeShape": "horizontal",
+            "gaugeDirection": "leftToRight",
+            "valueType": "fixed",
+            "value": 72,
+            "max": 100,
+            "color1": "#66ccff",
+            "color2": "#d0f1ff",
+            "zOrder": 20,
+            "visible": true
+          },
+          {
+            "type": "gauge",
+            "id": "Gauge_H_RL",
+            "x": 30,
+            "y": 122,
+            "width": 260,
+            "height": 18,
+            "gaugeShape": "horizontal",
+            "gaugeDirection": "rightToLeft",
+            "valueType": "fixed",
+            "value": 45,
+            "max": 100,
+            "color1": "#ff8e66",
+            "color2": "#ffd6c4",
+            "zOrder": 21,
+            "visible": true
+          },
+          {
+            "type": "gauge",
+            "id": "Gauge_V_BT",
+            "x": 352,
+            "y": 86,
+            "width": 30,
+            "height": 160,
+            "gaugeShape": "vertical",
+            "gaugeDirection": "bottomToTop",
+            "valueType": "fixed",
+            "value": 64,
+            "max": 100,
+            "color1": "#8aff7d",
+            "color2": "#d4ffd0",
+            "zOrder": 22,
+            "visible": true
+          },
+          {
+            "type": "gauge",
+            "id": "Gauge_V_TB",
+            "x": 406,
+            "y": 86,
+            "width": 30,
+            "height": 160,
+            "gaugeShape": "vertical",
+            "gaugeDirection": "topToBottom",
+            "valueType": "fixed",
+            "value": 38,
+            "max": 100,
+            "color1": "#c98aff",
+            "color2": "#ecd6ff",
+            "zOrder": 23,
+            "visible": true
+          },
+          {
+            "type": "gauge",
+            "id": "Gauge_Circle_CW",
+            "x": 70,
+            "y": 288,
+            "width": 92,
+            "height": 92,
+            "gaugeShape": "circle",
+            "gaugeDirection": "clockwise",
+            "gaugeStartAngle": 0,
+            "valueType": "fixed",
+            "value": 78,
+            "max": 100,
+            "color1": "#ffd25a",
+            "color2": "#fff0a8",
+            "zOrder": 24,
+            "visible": true
+          },
+          {
+            "type": "gauge",
+            "id": "Gauge_Circle_CCW",
+            "x": 220,
+            "y": 288,
+            "width": 92,
+            "height": 92,
+            "gaugeShape": "circle",
+            "gaugeDirection": "counterClockwise",
+            "gaugeStartAngle": 0,
+            "valueType": "fixed",
+            "value": 40,
+            "max": 100,
+            "color1": "#ff7ab8",
+            "color2": "#ffd0e6",
+            "zOrder": 25,
+            "visible": true
+          },
+          {
+            "type": "text",
+            "id": "Gauge_Guide",
+            "x": 20,
+            "y": 412,
+            "width": 620,
+            "text": "startAngle=0 が標準。必要に応じて direction と組み合わせて調整します。",
+            "fontSize": 15,
+            "color": "#cfe0ff",
+            "align": "left",
+            "zOrder": 50,
+            "visible": true
+          }
+        ]
+      }
+    ]
+  }
+}

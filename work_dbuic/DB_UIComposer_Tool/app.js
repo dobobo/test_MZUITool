@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.06";
+  const TOOL_VERSION = "0.4.30";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -63,12 +63,17 @@
   const PSD_IMPORT_CACHE_FILE_NAME = "_psd_import_cache.json";
   const PSD_IMPORT_ROOT_FOLDER = "psd_import";
   const COMPOSITE_EXPORT_ROOT_FOLDER = "composite_export";
+  const toolVersionLabel = $("toolVersionLabel");
+  if (toolVersionLabel) toolVersionLabel.textContent = `v${TOOL_VERSION}`;
+  document.title = `DB_UIComposer Tool v${TOOL_VERSION}`;
 
   // プレビュー上でオブジェクトを選択した時、左の一覧でも同じ行が
   // 確実に見える位置までスクロールするための予約フラグです。
   // render() が一覧DOMを作り直した後にだけ実行します。
   let pendingObjectListReveal = false;
   let objectClipboard = null;
+  let previewInlineEditClickCycle = null;
+  let previewInlineTextEditorState = null;
 
   function isObjectListControlTarget(target) {
     return !!target?.closest?.("button,input,select,textarea,.object-row-control-strip,.object-row-actions,.object-row-mini-button");
@@ -1744,6 +1749,9 @@
   function updateOutputs() {}
 
   function render(options = {}) {
+    if (previewInlineTextEditorState?.input && !document.contains(previewInlineTextEditorState.input)) {
+      previewInlineTextEditorState = null;
+    }
     // v0.3.92: 初回描画前に階層を正規化します。
     // activeSceneId が空のままだと、最初のプレビューだけ windowInActiveScene() が false になり、
     // クリック後の再描画まで何も出ないことがありました。
@@ -2035,7 +2043,9 @@
       itemForHandle = win?.items?.find(i => i.id === rect.itemId) || null;
     }
     const itemTypeForHandle = String(itemForHandle?.type || "");
-    const isImageScaleHandle = itemTypeForHandle === "image" || itemTypeForHandle === "compositeImage";
+    const isImageScaleHandle = itemTypeForHandle === "image"
+      || itemTypeForHandle === "compositeImage"
+      || (itemTypeForHandle === "button" && String(itemForHandle?.buttonVisualMode || "normal") !== "normal");
     if (isImageScaleHandle) handle.classList.add("focus-scale-handle");
     handle.title = rect.kind === "window"
       ? "選択中ウィンドウをリサイズします。重なっていてもこのハンドルが優先されます。"
@@ -2551,6 +2561,8 @@
       const rate = clamp(values.value / Math.max(1, values.max), 0, 1);
       const gaugeShape = String(item.gaugeShape || item.gaugeType || "horizontal");
       const gaugeDirection = String(item.gaugeDirection || (gaugeShape === "vertical" ? "bottomToTop" : "leftToRight"));
+      const gaugeStartAngle = ((Number(item.gaugeStartAngle ?? 0) % 360) + 360) % 360;
+      const cssStartDeg = gaugeStartAngle - 90;
       el.dataset.gaugeShape = gaugeShape;
       el.dataset.gaugeDirection = gaugeDirection;
 
@@ -2564,13 +2576,29 @@
         holder.className = className;
         holder.style.opacity = String(clamp(Number(def.opacity ?? 255) / 255, 0, 1));
         holder.style.overflow = clipRate !== null ? "hidden" : "visible";
+        if (gaugeShape === "circle") {
+          holder.style.width = "100%";
+          holder.style.height = "100%";
+          holder.style.borderRadius = "50%";
+        }
         if (clipRate !== null) {
-          const pct = `${Math.max(0, Math.min(1, clipRate)) * 100}%`;
+          const rate = clamp(Number(clipRate || 0), 0, 1);
+          const pct = `${rate * 100}%`;
           if (gaugeShape === "vertical") {
             holder.style.height = pct;
             holder.style.width = "100%";
             holder.style.top = gaugeDirection === "topToBottom" ? "0" : "auto";
             holder.style.bottom = gaugeDirection === "topToBottom" ? "auto" : "0";
+          } else if (gaugeShape === "circle") {
+            const deg = clamp(rate * 360, 0, 360);
+            if (gaugeDirection === "counterClockwise") {
+              const start = Math.max(0, 360 - deg);
+              holder.style.maskImage = `conic-gradient(from ${cssStartDeg}deg, transparent 0deg ${start}deg, #000 ${start}deg 360deg)`;
+              holder.style.webkitMaskImage = holder.style.maskImage;
+            } else {
+              holder.style.maskImage = `conic-gradient(from ${cssStartDeg}deg, #000 0deg ${deg}deg, transparent ${deg}deg 360deg)`;
+              holder.style.webkitMaskImage = holder.style.maskImage;
+            }
           } else {
             holder.style.width = pct;
             holder.style.height = "100%";
@@ -2599,14 +2627,14 @@
       const fillLayer = ensureGaugeImageLayer(item, "gaugeFillImage", "fill");
       const frontLayer = ensureGaugeImageLayer(item, "gaugeFrontImage", "front");
 
-      const backDrawn = gaugeShape === "circle" ? null : addGaugeImage(backLayer, "ui-gauge-image ui-gauge-back-image");
+      const backDrawn = addGaugeImage(backLayer, "ui-gauge-image ui-gauge-back-image");
       if (!backDrawn) {
         el.style.background = gaugeShape === "circle" ? `radial-gradient(circle at center, rgba(0,0,0,.72) 58%, transparent 59%), conic-gradient(rgba(0,0,0,.58) 0 100%)` : "rgba(0,0,0,.58)";
       } else {
         el.style.background = "transparent";
       }
 
-      const imageFillDrawn = gaugeShape === "circle" ? null : addGaugeImage(fillLayer, "ui-gauge-image ui-gauge-fill-image", rate);
+      const imageFillDrawn = addGaugeImage(fillLayer, "ui-gauge-image ui-gauge-fill-image", rate);
       if (!imageFillDrawn) {
         const fill = document.createElement("div");
         fill.className = "ui-gauge-fill";
@@ -2617,13 +2645,20 @@
           fill.style.bottom = gaugeDirection === "topToBottom" ? "auto" : "0";
           fill.style.background = `linear-gradient(0deg, ${item.color1 || "#ff6060"}, ${item.color2 || "#ffa0a0"})`;
         } else if (gaugeShape === "circle") {
-          const deg = rate * 360;
-          const dir = gaugeDirection === "counterClockwise" ? "-" : "";
+          const deg = clamp(rate * 360, 0, 360);
+          const color1 = item.color1 || "#ff6060";
+          const color2 = item.color2 || "#ffa0a0";
+          const isCounterClockwise = gaugeDirection === "counterClockwise";
           fill.style.inset = "0";
           fill.style.width = "100%";
           fill.style.height = "100%";
           fill.style.borderRadius = "50%";
-          fill.style.background = `radial-gradient(circle at center, rgba(0,0,0,.72) 58%, transparent 59%), conic-gradient(from -90deg, ${item.color1 || "#ff6060"} 0deg, ${item.color2 || "#ffa0a0"} ${dir}${deg}deg, transparent ${dir}${deg}deg 360deg)`;
+          if (isCounterClockwise) {
+            const start = Math.max(0, 360 - deg);
+            fill.style.background = `radial-gradient(circle at center, rgba(0,0,0,.72) 58%, transparent 59%), conic-gradient(from ${cssStartDeg}deg, transparent 0deg ${start}deg, ${color1} ${start}deg, ${color2} 360deg)`;
+          } else {
+            fill.style.background = `radial-gradient(circle at center, rgba(0,0,0,.72) 58%, transparent 59%), conic-gradient(from ${cssStartDeg}deg, ${color1} 0deg, ${color2} ${deg}deg, transparent ${deg}deg 360deg)`;
+          }
         } else {
           fill.style.width = `${rate * 100}%`;
           fill.style.height = "100%";
@@ -2634,7 +2669,7 @@
         el.appendChild(fill);
       }
 
-      if (gaugeShape !== "circle") addGaugeImage(frontLayer, "ui-gauge-image ui-gauge-front-image");
+      addGaugeImage(frontLayer, "ui-gauge-image ui-gauge-front-image");
 
       if (item.label) {
         const label = document.createElement("div");
@@ -2874,6 +2909,14 @@
 
     el.addEventListener("pointerdown", ev => {
       ev.stopPropagation();
+      const itemKey = `item:${win.id}/${item.id}`;
+      const isInlineEditable = item.type === "text" || item.type === "log";
+      if (isInlineEditable && consumePreviewInlineEditDoubleClick(ev, itemKey)) {
+        ev.preventDefault();
+        selectItem(win.id, item.id, { revealInList: false });
+        beginPreviewInlineTextEdit(win, item, el);
+        return;
+      }
       selectItem(win.id, item.id);
       const reason = positionLockReason(win, item);
       if (reason) { showToast(reason); return; }
@@ -3276,7 +3319,11 @@
     );
     const deletedWindowIds = new Set(
       (state.windows || [])
-        .filter(win => targetGroupIds.has(normalizeGroupId(win.groupId || "")))
+        .filter(win => {
+          const groupId = normalizeGroupId(win.groupId || "");
+          if (targetGroupIds.has(groupId)) return true;
+          return scene.includeUngrouped === true && !groupId;
+        })
         .map(win => win.id)
     );
     const ok = !window.confirm || window.confirm(`シーン「${scene.name || scene.id}」を削除します。所属グループ・ウィンドウ・パーツも一緒に削除されます。よろしいですか？`);
@@ -3569,7 +3616,6 @@
   }
 
   function stopObjectListControlEvent(ev) {
-    if (ev?.target?.closest?.(".object-drag-handle")) return;
     ev.preventDefault();
     ev.stopPropagation();
   }
@@ -3588,46 +3634,6 @@
     protectObjectListControl(strip);
     children.filter(Boolean).forEach(child => strip.appendChild(child));
     return strip;
-  }
-
-  function objectListDragPayloadText(payload) {
-    if (!payload || typeof payload !== "object") return "";
-    if (payload.kind === "group") return `group:${payload.groupId || ""}`;
-    if (payload.kind === "window") return `window:${payload.windowId || ""}`;
-    if (payload.kind === "item") return `item:${payload.windowId || ""}/${payload.itemId || ""}`;
-    return "";
-  }
-
-  function createObjectListDragHandle(title, payloadFactory) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "object-row-mini-button object-drag-handle";
-    button.textContent = "↕";
-    button.title = title || "ドラッグで移動";
-    button.setAttribute("aria-label", button.title);
-    button.draggable = true;
-    button.addEventListener("click", ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-    });
-    button.addEventListener("dragstart", ev => {
-      ev.stopPropagation();
-      const payload = typeof payloadFactory === "function" ? payloadFactory() : null;
-      if (!payload || !payload.kind) {
-        ev.preventDefault();
-        return;
-      }
-      objectListDragPayload = Object.assign({}, payload);
-      if (ev.dataTransfer) {
-        ev.dataTransfer.effectAllowed = "move";
-        ev.dataTransfer.setData("application/x-db-uicomposer-object", JSON.stringify(payload));
-        ev.dataTransfer.setData("text/plain", objectListDragPayloadText(payload));
-      }
-    });
-    button.addEventListener("dragend", () => {
-      objectListDragPayload = null;
-    });
-    return button;
   }
 
   function createObjectListVisibilityButton(visible, title, onToggle) {
@@ -4144,11 +4150,12 @@
     return Object.assign({ type: "text", id, x, y, width, text, fontSize, color: "", align: "left", zOrder: 0, visible: true }, extra || {});
   }
 
-  function sampleGaugeItem(id, x, y, width, height, value, max, label, color1, color2, shape = "horizontal", direction = "leftToRight") {
+  function sampleGaugeItem(id, x, y, width, height, value, max, label, color1, color2, shape = "horizontal", direction = "leftToRight", startAngle = 0) {
     return {
       type: "gauge", id, x, y, width, height,
       gaugeShape: shape,
       gaugeDirection: direction,
+      gaugeStartAngle: startAngle,
       valueType: "fixed", value, max, label,
       color1, color2,
       zOrder: 0,
@@ -4173,184 +4180,178 @@
   function createSampleSceneTemplates() {
     return [
       {
-        id: "sampleBasicStatus",
+        id: "sampleLayeringBasics",
         kind: "scene",
-        name: "Basic_Status：基本ステータス画面",
+        name: "01_Layering_Basics：背景を後ろに置く標準構成",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Basic_Status", name: "Basic_Status", groupIds: ["status_root", "actor_info", "gauge_group", "param_group", "guide_labels"], includeUngrouped: false },
+          scene: { id: "Layering_Basics", name: "Layering_Basics", groupIds: ["guide_group", "content_group", "bg_group"], includeUngrouped: false },
           groups: [
-            { id: "status_root", name: "背景・立ち絵枠", visible: true, locked: false },
-            { id: "actor_info", name: "名前・職業ブロック", visible: true, locked: false },
-            { id: "gauge_group", name: "HP/MP/TPゲージ", visible: true, locked: false },
-            { id: "param_group", name: "能力値リスト", visible: true, locked: false },
-            { id: "guide_labels", name: "説明ラベル（非表示可）", visible: true, locked: false }
+            { id: "guide_group", name: "前面ガイド", visible: true, locked: false },
+            { id: "content_group", name: "本文", visible: true, locked: false },
+            { id: "bg_group", name: "背景", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Status_Background_Window", "status_root", 40, 36, 736, 520, [
-              sampleTextItem("Status_Title", 22, 14, "STATUS", 30, 240, { color: "#ffffff" }),
-              sampleTextItem("Status_SubTitle", 24, 52, "Basic sample / edit and reuse freely", 15, 420, { color: "#b9c8df" })
-            ], { opacity: 210 }),
-            sampleWindowBase("Actor_Stand_Window", "status_root", 62, 118, 220, 360, [
-              sampleTextItem("Stand_Dummy", 22, 130, "立ち絵\nPLACEHOLDER", 25, 170, { align: "center", color: "#d7e6ff" }),
-              sampleTextItem("Stand_Note", 18, 282, "ここに画像パーツや統合画像を配置", 14, 180, { align: "center", color: "#9fb0c8" })
-            ], { backgroundType: "dim", opacity: 190 }),
-            sampleWindowBase("Actor_Info_Window", "actor_info", 310, 108, 420, 116, [
-              sampleTextItem("Actor_Name", 22, 12, "主人公", 28, 180, { color: "#ffffff" }),
-              sampleTextItem("Actor_Level", 250, 18, "Lv 12", 22, 100, { color: "#ffffff" }),
-              sampleTextItem("Actor_Class", 24, 58, "クラス：見習い冒険者", 18, 260, { color: "#cfe0ff" })
-            ]),
-            sampleWindowBase("Gauge_Window", "gauge_group", 310, 242, 420, 160, [
-              sampleTextItem("Hp_Label", 20, 16, "HP", 18, 50, { color: "#ffc0c0" }),
-              sampleGaugeItem("Hp_Gauge", 70, 20, 250, 16, 75, 100, "", "#ff5a5a", "#ffb0b0"),
-              sampleTextItem("Mp_Label", 20, 52, "MP", 18, 50, { color: "#b8d4ff" }),
-              sampleGaugeItem("Mp_Gauge", 70, 56, 250, 16, 42, 80, "", "#4b8bff", "#b8d4ff"),
-              sampleTextItem("Tp_Label", 338, 18, "TP", 16, 50, { align: "center", color: "#ffe7a0" }),
-              sampleGaugeItem("Tp_Circle", 332, 42, 58, 58, 35, 100, "", "#ffd15a", "#fff0a8", "circle", "clockwise")
-            ]),
-            sampleWindowBase("Parameter_Window", "param_group", 310, 420, 420, 92, [
-              sampleTextItem("Param_ATK", 20, 10, "攻撃  24", 18, 120),
-              sampleTextItem("Param_DEF", 160, 10, "防御  18", 18, 120),
-              sampleTextItem("Param_MAT", 20, 42, "魔法  31", 18, 120),
-              sampleTextItem("Param_AGI", 160, 42, "敏捷  22", 18, 120)
-            ]),
-            sampleWindowBase("Guide_Label_Window", "guide_labels", 58, 520, 710, 48, [
-              sampleTextItem("Guide_Text", 14, 8, "説明用ラベル：グループごと非表示にできます。各部品は一覧右端の保存アイコンで再利用可能です。", 15, 660, { color: "#d9e6ff" })
-            ], { opacity: 150 })
+            sampleWindowBase("Guide_Window", "guide_group", 80, 488, 644, 82, [
+              sampleTextItem("Guide_Text", 14, 10, "このウィンドウは説明用（前面）です。完成時は非表示にしてください。", 15, 604, { color: "#ffe0a8", zOrder: 100 })
+            ], { opacity: 140, zOrder: 240 }),
+            sampleWindowBase("Content_Window", "content_group", 92, 120, 620, 340, [
+              sampleTextItem("Content_Title", 22, 14, "本文ウィンドウ（zOrder: 0）", 28, 460, { color: "#ffffff", zOrder: 20 }),
+              sampleTextItem("Content_Desc", 22, 64, "背景は低いzOrder、本文は中間、ガイドは高いzOrderにすると\n前後関係の混乱を防げます。", 17, 560, { color: "#d5e2f5", zOrder: 30 })
+            ], { zOrder: 0 }),
+            sampleWindowBase("Background_Window", "bg_group", 24, 20, 768, 560, [
+              sampleTextItem("Background_Label", 24, 20, "背景ウィンドウ（最背面）\n常に後ろへ置く基礎見本", 22, 520, { color: "#bcd0ea", zOrder: -10 })
+            ], { opacity: 160, backgroundType: "dim", zOrder: -300 })
           ]
         }
       },
       {
-        id: "sampleGaugeSample",
+        id: "sampleTextLogBasics",
         kind: "scene",
-        name: "Gauge_Sample：ゲージ一覧",
+        name: "02_Text_Log_Basics：text/logカテゴリの基本",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Gauge_Sample", name: "Gauge_Sample", groupIds: ["gauge_samples"], includeUngrouped: false },
-          groups: [{ id: "gauge_samples", name: "ゲージサンプル", visible: true, locked: false }],
+          scene: { id: "Text_Log_Basics", name: "Text_Log_Basics", groupIds: ["textlog_group"], includeUngrouped: false },
+          groups: [{ id: "textlog_group", name: "Text/Log", visible: true, locked: false }],
           windows: [
-            sampleWindowBase("Gauge_Sample_Window", "gauge_samples", 80, 70, 620, 420, [
-              sampleTextItem("Gauge_Title", 22, 16, "Gauge Sample", 28, 260),
-              sampleTextItem("H_Label", 36, 76, "横ゲージ：左→右 / 右→左", 18, 260),
-              sampleGaugeItem("Horizontal_LR", 36, 112, 240, 18, 65, 100, "", "#66ccff", "#d0f1ff", "horizontal", "leftToRight"),
-              sampleGaugeItem("Horizontal_RL", 36, 148, 240, 18, 40, 100, "", "#ff8e66", "#ffd6c4", "horizontal", "rightToLeft"),
-              sampleTextItem("V_Label", 330, 76, "縦ゲージ：上下方向", 18, 220),
-              sampleGaugeItem("Vertical_BU", 344, 112, 28, 160, 70, 100, "", "#8aff7d", "#d4ffd0", "vertical", "bottomToTop"),
-              sampleGaugeItem("Vertical_TB", 398, 112, 28, 160, 45, 100, "", "#c98aff", "#ecd6ff", "vertical", "topToBottom"),
-              sampleTextItem("C_Label", 36, 220, "円ゲージ：時計回り / 反時計回り", 18, 300),
-              sampleGaugeItem("Circle_CW", 60, 260, 86, 86, 75, 100, "", "#ffd25a", "#fff0a8", "circle", "clockwise"),
-              sampleGaugeItem("Circle_CCW", 190, 260, 86, 86, 45, 100, "", "#ff7ab8", "#ffd0e6", "circle", "counterClockwise")
+            sampleWindowBase("Text_Log_Window", "textlog_group", 70, 56, 680, 500, [
+              sampleTextItem("Text_Title", 20, 14, "textカテゴリの見本（複数行・揃え・色）", 27, 560, { color: "#ffffff", zOrder: 10 }),
+              sampleTextItem("Text_MultiLine", 20, 64, "1行目：テキスト基本\n2行目：インライン編集の改行確認\n3行目：outline/color/fontSize調整対象", 18, 620, { color: "#dce8ff", zOrder: 20 }),
+              { type: "log", id: "Log_Preview", x: 20, y: 190, width: 620, height: 220, fontSize: 18, lineHeight: 30, color: "#ffffff", paddingX: 8, paddingY: 8, maxLines: 5, displayFrames: 180, fadeFrames: 30, moveFrames: 20, sampleText: "ログを追加しました。\nアイテムを入手しました。\nHPが10回復しました。\n目的地を更新しました。", zOrder: 30, visible: true },
+              sampleTextItem("Log_Guide", 20, 430, "logカテゴリは AddItemLogText コマンド連携向けです。", 15, 620, { color: "#b8d0f0", zOrder: 40 })
             ])
           ]
         }
       },
       {
-        id: "sampleLogSample",
+        id: "sampleGaugeDirections",
         kind: "scene",
-        name: "Log_Sample：ログ表示",
+        name: "03_Gauge_Directions：横/縦/円ゲージ比較",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Log_Sample", name: "Log_Sample", groupIds: ["log_samples"], includeUngrouped: false },
-          groups: [{ id: "log_samples", name: "ログサンプル", visible: true, locked: false }],
+          scene: { id: "Gauge_Directions", name: "Gauge_Directions", groupIds: ["gauge_group"], includeUngrouped: false },
+          groups: [{ id: "gauge_group", name: "Gauge", visible: true, locked: false }],
           windows: [
-            sampleWindowBase("Log_Sample_Window", "log_samples", 80, 80, 620, 340, [
-              sampleTextItem("Log_Title", 20, 16, "Log Item Sample", 28, 300),
-              { type: "log", id: "Notice_Log", x: 26, y: 72, width: 520, height: 170, fontSize: 18, lineHeight: 30, color: "#ffffff", paddingX: 8, paddingY: 8, maxLines: 5, lineVisibleFrames: 180, fadeFrames: 30, moveFrames: 20, sampleText: "ログを追加しました。\nアイテムを入手しました。\nHPが回復しました。\n新しいクエストが開始されました。", zOrder: 0, visible: true },
-              sampleTextItem("Log_Guide", 26, 260, "MZ側では AddItemLogText でこのログパーツに行を追加できます。", 16, 520, { color: "#cfe0ff" })
+            sampleWindowBase("Gauge_Window", "gauge_group", 70, 54, 680, 500, [
+              sampleTextItem("Gauge_Title", 20, 12, "gaugeカテゴリ：方向・形状・開始角度", 27, 520, { color: "#ffffff", zOrder: 10 }),
+              sampleGaugeItem("Gauge_H_LR", 30, 86, 260, 18, 72, 100, "", "#66ccff", "#d0f1ff", "horizontal", "leftToRight"),
+              sampleGaugeItem("Gauge_H_RL", 30, 122, 260, 18, 45, 100, "", "#ff8e66", "#ffd6c4", "horizontal", "rightToLeft"),
+              sampleGaugeItem("Gauge_V_BT", 352, 86, 30, 160, 64, 100, "", "#8aff7d", "#d4ffd0", "vertical", "bottomToTop"),
+              sampleGaugeItem("Gauge_V_TB", 406, 86, 30, 160, 38, 100, "", "#c98aff", "#ecd6ff", "vertical", "topToBottom"),
+              sampleGaugeItem("Gauge_Circle_CW", 70, 288, 92, 92, 78, 100, "", "#ffd25a", "#fff0a8", "circle", "clockwise", 0),
+              sampleGaugeItem("Gauge_Circle_CCW", 220, 288, 92, 92, 40, 100, "", "#ff7ab8", "#ffd0e6", "circle", "counterClockwise", 0),
+              sampleTextItem("Gauge_Guide", 20, 412, "startAngle=0 が標準。必要に応じて direction と組み合わせて調整します。", 15, 620, { color: "#cfe0ff", zOrder: 50 })
             ])
           ]
         }
       },
       {
-        id: "tutorialStructure",
+        id: "sampleImageCompositeBasics",
         kind: "scene",
-        name: "Tutorial_01：シーン・グループ・ウィンドウの考え方",
+        name: "04_Image_Composite_Basics：image/compositeImage基礎",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Tutorial_01_Structure", name: "Tutorial_01_Structure", groupIds: ["tutorial_scene", "tutorial_groups", "tutorial_windows"], includeUngrouped: false },
+          scene: { id: "Image_Composite_Basics", name: "Image_Composite_Basics", groupIds: ["image_group"], includeUngrouped: false },
+          groups: [{ id: "image_group", name: "Image/Composite", visible: true, locked: false }],
+          windows: [
+            sampleWindowBase("Image_Composite_Window", "image_group", 72, 56, 676, 500, [
+              sampleTextItem("Image_Title", 20, 14, "image / compositeImage カテゴリ", 27, 620, { color: "#ffffff", zOrder: 10 }),
+              { type: "image", id: "Single_Image", x: 24, y: 78, width: 180, height: 120, folder: "pictures", fileName: "", scaleX: 1, scaleY: 1, scaleXPercent: 100, scaleYPercent: 100, opacity: 255, zOrder: 20, visible: true },
+              sampleTextItem("Single_Image_Guide", 24, 206, "image：単体画像。画像選択後に\n原寸ボタンで自然サイズへ戻せます。", 14, 260, { color: "#cfe0ff", zOrder: 21 }),
+              {
+                type: "compositeImage",
+                id: "Composite_Image",
+                x: 330,
+                y: 78,
+                width: 220,
+                height: 160,
+                scaleX: 1,
+                scaleY: 1,
+                scaleXPercent: 100,
+                scaleYPercent: 100,
+                opacity: 255,
+                selectedLayerIndex: 0,
+                selectedPresetId: "",
+                layers: [
+                  { id: "layer1", name: "レイヤー1", layerKind: "compositeImageLayer", visible: true, folder: "pictures", fileName: "", previewSrc: "", previewName: "", previewNaturalWidth: 0, previewNaturalHeight: 0, x: 0, y: 0, width: 220, height: 160, opacity: 255, priority: 1, blendMode: "normal" }
+                ],
+                zOrder: 30,
+                visible: true
+              },
+              sampleTextItem("Composite_Guide", 330, 250, "compositeImage：複数レイヤーを重ねるカテゴリ。\nPSD/名前ID連携のベースとして使えます。", 14, 320, { color: "#cfe0ff", zOrder: 31 })
+            ])
+          ]
+        }
+      },
+      {
+        id: "sampleButtonChoiceBasics",
+        kind: "scene",
+        name: "05_Button_Choice_Basics：button/choiceList/imageChoiceList",
+        savedAt: "sample",
+        version: TOOL_VERSION,
+        data: {
+          scene: { id: "Button_Choice_Basics", name: "Button_Choice_Basics", groupIds: ["menu_group"], includeUngrouped: false },
           groups: [
-            { id: "tutorial_scene", name: "1 シーン説明", visible: true, locked: false },
-            { id: "tutorial_groups", name: "2 グループ説明", visible: true, locked: false },
-            { id: "tutorial_windows", name: "3 ウィンドウ説明", visible: true, locked: false }
+            { id: "menu_group", name: "Menu Components", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Tutorial_Title_Window", "tutorial_scene", 34, 28, 748, 84, [
-              sampleTextItem("Tutorial_Title", 20, 12, "DB_UIComposer チュートリアル 01", 28, 420, { color: "#ffffff" }),
-              sampleTextItem("Tutorial_Sub", 22, 48, "まずは、シーン → グループ → ウィンドウ → パーツ の階層を確認するサンプルです。", 16, 690, { color: "#cfe0ff" })
-            ], { opacity: 210 }),
-            sampleWindowBase("Scene_Explain_Window", "tutorial_scene", 46, 132, 704, 118, [
-              sampleTextItem("Scene_H", 18, 12, "1. シーン", 24, 180, { color: "#ffe7a0" }),
-              sampleTextItem("Scene_Body", 22, 48, "シーンは画面全体の保存単位です。ステータス画面、戦闘HUD、ショップUIなどを、ひとつの完成画面として保存・読み込みできます。", 16, 650, { color: "#ffffff" })
-            ]),
-            sampleWindowBase("Group_Explain_Window", "tutorial_groups", 46, 270, 704, 126, [
-              sampleTextItem("Group_H", 18, 12, "2. グループ", 24, 180, { color: "#b8ffce" }),
-              sampleTextItem("Group_Body", 22, 48, "グループは複数のウィンドウやパーツをまとめる単位です。まとめて表示/非表示、ロック、保存、移動ができます。例：HP/MP欄、キャラ情報欄、説明ラベル群。", 16, 650, { color: "#ffffff" })
-            ]),
-            sampleWindowBase("Window_Explain_Window", "tutorial_windows", 46, 416, 704, 126, [
-              sampleTextItem("Window_H", 18, 12, "3. ウィンドウ", 24, 180, { color: "#b8d4ff" }),
-              sampleTextItem("Window_Body", 22, 48, "ウィンドウは枠・背景・配置範囲を持つ入れ物です。中にテキスト、画像、ゲージ、ログ、ボタンなどのパーツを置きます。", 16, 650, { color: "#ffffff" })
+            sampleWindowBase("Button_Choice_Window", "menu_group", 70, 56, 680, 500, [
+              sampleTextItem("Menu_Title", 20, 14, "button / choiceList / imageChoiceList", 27, 620, { color: "#ffffff", zOrder: 10 }),
+              { type: "button", id: "Normal_Button", x: 28, y: 72, width: 180, height: 42, text: "通常ボタン", buttonVisualMode: "normal", zOrder: 20, visible: true },
+              { type: "button", id: "Image_Button", x: 232, y: 72, width: 200, height: 42, text: "画像ボタン（未設定）", buttonVisualMode: "image", zOrder: 21, visible: true },
+              {
+                type: "choiceList",
+                id: "Choice_List",
+                x: 28,
+                y: 146,
+                choiceMode: "tool",
+                width: 220,
+                rowHeight: 32,
+                maxVisibleRows: 5,
+                choices: ["探索", "休憩", "戻る"],
+                choiceRules: [
+                  { text: "探索", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" },
+                  { text: "休憩", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" },
+                  { text: "戻る", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" }
+                ],
+                autoResizeWindow: true,
+                normalBackColor: "rgba(255,255,255,.10)",
+                hoverBackColor: "rgba(255,255,255,.22)",
+                selectedBackColor: "rgba(98,169,255,.35)",
+                disabledBackColor: "rgba(0,0,0,.28)",
+                disabledTextColor: "rgba(180,180,180,.85)",
+                borderColor: "rgba(255,255,255,.35)",
+                textColor: "",
+                fontSize: 18,
+                align: "center",
+                closeWindowOnSelect: false,
+                choiceEnabled: [true, true, true],
+                disabledIndexes: "",
+                resultVariableId: 0,
+                commonEventId: 0,
+                script: "",
+                zOrder: 30,
+                visible: true
+              },
+              {
+                type: "imageChoiceList",
+                id: "Image_Choice_List",
+                x: 320,
+                y: 152,
+                width: 180,
+                height: 110,
+                selectedOptionIndex: 0,
+                closeWindowOnSelect: false,
+                options: [createDefaultImageChoiceOption(0), createDefaultImageChoiceOption(1)],
+                zOrder: 31,
+                visible: true
+              },
+              sampleTextItem("Menu_Guide", 20, 410, "buttonは単発操作、choiceListは文字選択、imageChoiceListは画像選択向け。", 15, 620, { color: "#cfe0ff", zOrder: 60 })
             ])
-          ]
-        }
-      },
-      {
-        id: "tutorialParts",
-        kind: "scene",
-        name: "Tutorial_02：パーツ種類とプロパティ確認",
-        savedAt: "sample",
-        version: TOOL_VERSION,
-        data: {
-          scene: { id: "Tutorial_02_Parts", name: "Tutorial_02_Parts", groupIds: ["tutorial_parts"], includeUngrouped: false },
-          groups: [{ id: "tutorial_parts", name: "パーツ説明", visible: true, locked: false }],
-          windows: [
-            sampleWindowBase("Parts_Explain_Window", "tutorial_parts", 38, 34, 742, 514, [
-              sampleTextItem("Parts_Title", 20, 12, "パーツの基本", 28, 300, { color: "#ffffff" }),
-              sampleTextItem("Text_Label", 30, 70, "テキスト：名前、説明、数値表示に使います。色、サイズ、幅、揃えを調整できます。", 16, 640, { color: "#ffffff" }),
-              sampleTextItem("Image_Label", 30, 114, "画像：立ち絵、アイコン、装飾などに使います。画像ボタンやPSDボタンの土台にもなります。", 16, 640, { color: "#ffffff" }),
-              sampleTextItem("Gauge_Label", 30, 158, "ゲージ：横・縦・円に対応。値タイプを変数/固定/アクターHPなどにできます。", 16, 640, { color: "#ffffff" }),
-              sampleGaugeItem("Tutorial_HP_Gauge", 54, 204, 260, 18, 80, 100, "", "#ff6060", "#ffb0b0", "horizontal", "leftToRight"),
-              sampleGaugeItem("Tutorial_V_Gauge", 364, 196, 28, 86, 55, 100, "", "#66ccff", "#d0f1ff", "vertical", "bottomToTop"),
-              sampleGaugeItem("Tutorial_C_Gauge", 448, 196, 86, 86, 45, 100, "", "#ffd25a", "#fff0a8", "circle", "clockwise"),
-              { type: "log", id: "Tutorial_Log", x: 54, y: 318, width: 520, height: 92, fontSize: 16, lineHeight: 24, color: "#ffffff", paddingX: 8, paddingY: 8, maxLines: 3, lineVisibleFrames: 180, fadeFrames: 30, moveFrames: 20, sampleText: "ログパーツです。\n1行ごとの表示時間を設定できます。", zOrder: 0, visible: true },
-              sampleTextItem("Parts_Guide", 30, 440, "右側プロパティを見ながら、各パーツの値を変更してみてください。左一覧の保存アイコンで部品化できます。", 16, 660, { color: "#cfe0ff" })
-            ])
-          ]
-        }
-      },
-      {
-        id: "tutorialReuse",
-        kind: "scene",
-        name: "Tutorial_03：保存・読込・再利用の流れ",
-        savedAt: "sample",
-        version: TOOL_VERSION,
-        data: {
-          scene: { id: "Tutorial_03_Reuse", name: "Tutorial_03_Reuse", groupIds: ["tutorial_reuse", "tutorial_save_targets"], includeUngrouped: false },
-          groups: [
-            { id: "tutorial_reuse", name: "保存読込の説明", visible: true, locked: false },
-            { id: "tutorial_save_targets", name: "保存して試す部品", visible: true, locked: false }
-          ],
-          windows: [
-            sampleWindowBase("Reuse_Guide_Window", "tutorial_reuse", 38, 40, 742, 206, [
-              sampleTextItem("Reuse_Title", 20, 12, "保存・読込チュートリアル", 28, 380, { color: "#ffffff" }),
-              sampleTextItem("Reuse_1", 24, 62, "1. 一覧の右端にある保存アイコンで、シーン/グループ/ウィンドウ/パーツをファイル保存できます。", 16, 680, { color: "#ffffff" }),
-              sampleTextItem("Reuse_2", 24, 96, "2. 読み込みアイコンは『追加』として働きます。既存レイアウトを壊さず、部品を現在の画面へ足せます。", 16, 680, { color: "#ffffff" }),
-              sampleTextItem("Reuse_3", 24, 130, "3. 読み込み時はID重複を避けるため、自動でコピーIDが付与されます。", 16, 680, { color: "#ffffff" })
-            ]),
-            sampleWindowBase("Reusable_Status_Block", "tutorial_save_targets", 76, 286, 304, 170, [
-              sampleTextItem("Reusable_Name", 18, 14, "再利用用ステータス部品", 20, 230, { color: "#ffffff" }),
-              sampleTextItem("Reusable_Hp_Label", 20, 62, "HP", 16, 40, { color: "#ffc0c0" }),
-              sampleGaugeItem("Reusable_Hp", 64, 66, 190, 14, 62, 100, "", "#ff6060", "#ffb0b0", "horizontal", "leftToRight"),
-              sampleTextItem("Reusable_Note", 20, 104, "このウィンドウやグループを保存して、別画面で読み込んでみてください。", 14, 250, { color: "#cfe0ff" })
-            ], { opacity: 220 }),
-            sampleWindowBase("Reusable_Button_Block", "tutorial_save_targets", 428, 286, 256, 170, [
-              sampleTextItem("Reusable_Button_Title", 18, 16, "ボタン部品の土台", 20, 200, { color: "#ffffff" }),
-              { type: "button", id: "Reusable_Button", x: 34, y: 70, width: 156, height: 42, text: "OK", buttonType: "normal", zOrder: 0, visible: true },
-              sampleTextItem("Reusable_Button_Note", 20, 124, "画像ボタン/PSDボタンに変更して使えます。", 14, 210, { color: "#cfe0ff" })
-            ], { opacity: 220 })
           ]
         }
       }
@@ -4713,6 +4714,7 @@
     for (const win of state.windows || []) {
       if (!orderedWindows.includes(win)) orderedWindows.push(win);
     }
+    // 一覧は Photoshop レイヤー同様に「上ほど手前、下ほど奥」で同期します。
     const totalWin = orderedWindows.length;
     orderedWindows.forEach((win, index) => { win.zOrder = totalWin - index; });
     for (const win of state.windows || []) {
@@ -4837,6 +4839,131 @@
     });
   }
 
+  function setObjectListSelectionDuringDrag(nextSelection, row) {
+    if (!nextSelection || typeof nextSelection !== "object") return;
+    selected = nextSelection;
+    pendingObjectListReveal = false;
+    const label = $("currentSelection");
+    if (label) label.textContent = selectionLabel();
+    const key = selectedObjectListKey();
+    objectList.querySelectorAll(".object-row.active").forEach(el => el.classList.remove("active"));
+    if (row?.classList?.contains("object-row")) {
+      row.classList.add("active");
+      return;
+    }
+    for (const el of objectList.querySelectorAll(".object-row[data-object-key]")) {
+      if (el.dataset.objectKey === key) {
+        el.classList.add("active");
+        break;
+      }
+    }
+  }
+
+  function consumePreviewInlineEditDoubleClick(ev, key) {
+    if (!ev || !key || ev.button !== 0) {
+      previewInlineEditClickCycle = null;
+      return false;
+    }
+    const now = performance.now();
+    const prev = previewInlineEditClickCycle;
+    const isSecond = !!prev
+      && prev.key === key
+      && now - prev.time <= 550
+      && Math.abs((prev.x || 0) - (ev.clientX || 0)) <= 8
+      && Math.abs((prev.y || 0) - (ev.clientY || 0)) <= 8;
+    previewInlineEditClickCycle = isSecond ? null : {
+      key,
+      time: now,
+      x: ev.clientX || 0,
+      y: ev.clientY || 0
+    };
+    return isSecond;
+  }
+
+  function closePreviewInlineTextEditor(commit = true) {
+    const session = previewInlineTextEditorState;
+    if (!session) return;
+    previewInlineTextEditorState = null;
+    const { input, item, initialText, kind, row } = session;
+    const nextText = String(input?.value ?? "");
+    try { input?.remove(); } catch (_) {}
+    row?.classList?.remove("preview-inline-editing");
+    if (!commit || !item || nextText === initialText) return;
+    runPropertyValueMutation(kind === "log" ? "プレビュー上ログ文字編集" : "プレビュー上テキスト編集", () => {
+      if (kind === "log") item.sampleText = nextText;
+      else item.text = nextText;
+    });
+  }
+
+  function beginPreviewInlineTextEdit(win, item, row) {
+    if (!win || !item || !row) return;
+    const kind = item.type === "log" ? "log" : "text";
+    if (kind !== "text" && kind !== "log") return;
+    closePreviewInlineTextEditor(true);
+    const input = document.createElement("textarea");
+    input.className = "preview-inline-text-editor";
+    if (kind === "log") input.classList.add("preview-inline-text-editor-log");
+    else input.classList.add("preview-inline-text-editor-text");
+    const initialText = String(kind === "log" ? (item.sampleText || "") : (item.text || ""));
+    input.value = initialText;
+    const computed = window.getComputedStyle(row);
+    input.style.color = computed.color || "";
+    input.style.textShadow = computed.textShadow || "none";
+    input.style.fontFamily = computed.fontFamily || "";
+    input.style.fontSize = computed.fontSize || "";
+    input.style.fontWeight = computed.fontWeight || "";
+    input.style.fontStyle = computed.fontStyle || "";
+    input.style.webkitTextStroke = "0 transparent";
+    input.style.paintOrder = "normal";
+    input.style.textAlign = String(item.align || "left");
+    input.style.lineHeight = `${previewLineHeight()}px`;
+    row.classList.add("preview-inline-editing");
+    row.appendChild(input);
+    previewInlineTextEditorState = { input, item, initialText, kind, row };
+    ["pointerdown", "mousedown", "click", "dblclick", "dragstart", "contextmenu"].forEach(type => {
+      input.addEventListener(type, ev => {
+        ev.stopPropagation();
+      });
+    });
+    input.addEventListener("keydown", ev => {
+      ev.stopPropagation();
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        closePreviewInlineTextEditor(false);
+      } else if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+        ev.preventDefault();
+        closePreviewInlineTextEditor(true);
+      }
+    });
+    input.addEventListener("blur", () => closePreviewInlineTextEditor(true));
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 0);
+  }
+
+  function tryBeginFocusedInlineEditFromCapture(ev, hits) {
+    if (selected?.kind !== "item") return false;
+    const win = selectedWindow();
+    const item = selectedItem();
+    if (!win || !item) return false;
+    if (item.type !== "text" && item.type !== "log") return false;
+    const key = selectedCandidateKey();
+    if (!key || !(hits || []).some(candidate => candidateKey(candidate) === key)) return false;
+    const selectedRow = Array.from(preview.querySelectorAll(".ui-item.selected")).find(el =>
+      el.dataset.windowId === win.id && el.dataset.itemId === item.id
+    );
+    const pointedRow = ev?.target?.closest?.(".ui-item");
+    const targetRow = selectedRow || pointedRow;
+    if (!targetRow) return false;
+    if (targetRow.dataset.windowId !== win.id || targetRow.dataset.itemId !== item.id) return false;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    ev.stopPropagation();
+    beginPreviewInlineTextEdit(win, item, targetRow);
+    return true;
+  }
+
   function autoScrollObjectListWhileDragging(clientY) {
     if (!objectListDragPayload) return;
     const rect = objectList.getBoundingClientRect();
@@ -4852,28 +4979,70 @@
   }
 
   function bindObjectListRowDrop(row, target) {
+    const resolveDropPlacement = (ev, data) => {
+      const rect = row.getBoundingClientRect();
+      const edgeBand = Math.max(6, Math.min(12, Math.floor(rect.height * 0.24)));
+      const nearTop = ev.clientY <= rect.top + edgeBand;
+      const nearBottom = ev.clientY >= rect.bottom - edgeBand;
+      const containerDrop = (target.kind === "group" && data.kind === "window")
+        || (target.kind === "window" && data.kind === "item");
+      const windowOverItemDrop = target.kind === "item" && data.kind === "window";
+      const groupOverDescendantDrop = data.kind === "group" && (target.kind === "window" || target.kind === "item");
+      if (containerDrop) {
+        if (nearTop) return "before";
+        if (nearBottom) return "after";
+        return "";
+      }
+      if (windowOverItemDrop) {
+        if (nearTop) return "before";
+        if (nearBottom) return "after";
+        return "";
+      }
+      if (groupOverDescendantDrop) {
+        if (nearTop) return "before";
+        if (nearBottom) return "after";
+        return "";
+      }
+      return ev.clientY > rect.top + rect.height / 2 ? "after" : "before";
+    };
+
     row.addEventListener("dragover", ev => {
       const data = parseObjectListDragData(ev);
       if (!data) return;
       let allowed = false;
       if (data.kind === "group" && target.kind === "group" && data.groupId !== target.groupId) allowed = true;
+      if (data.kind === "group" && target.kind === "window") {
+        const targetWin = (state.windows || []).find(entry => entry.id === target.windowId);
+        const targetGroupId = normalizeGroupId(targetWin?.groupId || "");
+        if (targetGroupId && data.groupId !== targetGroupId) allowed = true;
+      }
+      if (data.kind === "group" && target.kind === "item") {
+        const targetWin = (state.windows || []).find(entry => entry.id === target.windowId);
+        const targetGroupId = normalizeGroupId(targetWin?.groupId || "");
+        if (targetGroupId && data.groupId !== targetGroupId) allowed = true;
+      }
       if (data.kind === "window" && (target.kind === "group" || target.kind === "window")) allowed = true;
+      if (data.kind === "window" && target.kind === "item" && data.windowId !== target.windowId) allowed = true;
       if (data.kind === "item" && (target.kind === "window" || target.kind === "item")) allowed = true;
       if (!allowed) return;
+      const placement = resolveDropPlacement(ev, data);
+      if (!placement) return;
       ev.preventDefault();
       autoScrollObjectListWhileDragging(ev.clientY);
       if (ev.dataTransfer) ev.dataTransfer.dropEffect = "move";
       clearObjectListDropMarks();
-      const rect = row.getBoundingClientRect();
-      const isTailTarget = target?.tail === true;
-      const after = isTailTarget ? true : ev.clientY > rect.top + rect.height / 2;
-      const into = !isTailTarget && (target.kind === "group" && data.kind === "window" || target.kind === "window" && data.kind === "item");
-      row.classList.add(into ? "drop-into" : (after ? "drop-after" : "drop-before"));
+      row.classList.add(placement === "after" ? "drop-after" : "drop-before");
       const parentName = target.kind === "group" ? (groupName(target.groupId) || target.groupId) : target.kind === "window" ? target.windowId : target.kind === "item" ? target.windowId : "";
-      if (isTailTarget) {
+      if (placement === "after" && (target.kind === "group" || target.kind === "window")) {
         row.dataset.dropHint = `末尾へ移動: ${parentName}`;
+      } else if (placement === "before" && (target.kind === "group" || target.kind === "window")) {
+        row.dataset.dropHint = `先頭へ移動: ${parentName}`;
+      } else if (target.kind === "item" && data.kind === "window") {
+        row.dataset.dropHint = `${placement === "after" ? "下" : "上"}へ移動: ${target.windowId}`;
+      } else if (data.kind === "group" && (target.kind === "window" || target.kind === "item")) {
+        row.dataset.dropHint = `${placement === "after" ? "下" : "上"}へ移動: ${target.windowId}`;
       } else {
-        row.dataset.dropHint = into ? `ここへ入れる: ${parentName}` : `${after ? "下" : "上"}へ移動: ${parentName}`;
+        row.dataset.dropHint = `${placement === "after" ? "下" : "上"}へ移動: ${parentName}`;
       }
     });
     row.addEventListener("dragleave", ev => {
@@ -4884,14 +5053,34 @@
       if (!data) return;
       ev.preventDefault();
       ev.stopPropagation();
-      const rect = row.getBoundingClientRect();
-      const position = target?.tail === true
-        ? "after"
-        : (ev.clientY > rect.top + rect.height / 2 ? "after" : "before");
+      const placement = resolveDropPlacement(ev, data);
+      if (!placement) {
+        clearObjectListDropMarks();
+        return;
+      }
+      const position = placement === "before" ? "before" : "after";
       clearObjectListDropMarks();
       if (data.kind === "group" && target.kind === "group") return reorderGroupByList(data.groupId, target.groupId, position);
+      if (data.kind === "group" && target.kind === "window") {
+        const targetWin = (state.windows || []).find(entry => entry.id === target.windowId);
+        const targetGroupId = normalizeGroupId(targetWin?.groupId || "");
+        if (!targetGroupId || data.groupId === targetGroupId) return;
+        return reorderGroupByList(data.groupId, targetGroupId, position);
+      }
+      if (data.kind === "group" && target.kind === "item") {
+        const targetWin = (state.windows || []).find(entry => entry.id === target.windowId);
+        const targetGroupId = normalizeGroupId(targetWin?.groupId || "");
+        if (!targetGroupId || data.groupId === targetGroupId) return;
+        return reorderGroupByList(data.groupId, targetGroupId, position);
+      }
       if (data.kind === "window" && target.kind === "group") return moveWindowToGroupAt(data.windowId, target.groupId, "", position);
       if (data.kind === "window" && target.kind === "window") return moveWindowToGroupAt(data.windowId, target.groupId, target.windowId, position);
+      if (data.kind === "window" && target.kind === "item") {
+        const targetWin = (state.windows || []).find(entry => entry.id === target.windowId);
+        if (!targetWin) return;
+        const targetGroupId = normalizeGroupId(targetWin.groupId || "");
+        return moveWindowToGroupAt(data.windowId, targetGroupId, target.windowId, position);
+      }
       if (data.kind === "item" && target.kind === "window") return moveItemToWindowAt(data.windowId, data.itemId, target.windowId, "", position);
       if (data.kind === "item" && target.kind === "item") return moveItemToWindowAt(data.windowId, data.itemId, target.windowId, target.itemId, position);
     });
@@ -5024,6 +5213,7 @@
       row.title = [row.title, "ドラッグして別グループへ移動できます"].filter(Boolean).join(" / ");
       row.addEventListener("dragstart", ev => {
         ev.stopPropagation();
+        setObjectListSelectionDuringDrag({ kind: "window", windowId: win.id }, row);
         const payload = { kind: "window", windowId: win.id };
         objectListDragPayload = payload;
         if (ev.dataTransfer) {
@@ -5110,7 +5300,6 @@
         makeWindowDraggable(row, win);
 
         row.appendChild(createObjectListControlStrip(
-          createObjectListDragHandle("このウィンドウをドラッグ移動", () => ({ kind: "window", windowId: win.id })),
           createObjectListCollapseButton(windowCollapsed, windowCollapsed ? "パーツ一覧を展開" : "パーツ一覧を折りたたみ", () => toggleObjectListWindowCollapsed(win.id)),
           createObjectListVisibilityButton(win.visible !== false, win.visible === false ? "このウィンドウを表示" : "このウィンドウを非表示", () => {
             runStateMutation("一覧ウィンドウ表示切替", () => { win.visible = win.visible === false; });
@@ -5166,7 +5355,6 @@
           if (sceneHidden) itemRow.classList.add("scene-hidden");
 
           itemRow.appendChild(createObjectListControlStrip(
-            createObjectListDragHandle("このパーツをドラッグ移動", () => ({ kind: "item", windowId: win.id, itemId: item.id })),
             createObjectListVisibilityButton(item.visible !== false, item.visible === false ? "このパーツを表示" : "このパーツを非表示", () => {
               runStateMutation("一覧パーツ表示切替", () => { item.visible = item.visible === false; });
             }),
@@ -5203,6 +5391,7 @@
           itemRow.draggable = true;
           itemRow.addEventListener("dragstart", ev => {
             ev.stopPropagation();
+            setObjectListSelectionDuringDrag({ kind: "item", windowId: win.id, itemId: item.id }, itemRow);
             const payload = { kind: "item", windowId: win.id, itemId: item.id };
             objectListDragPayload = payload;
             if (ev.dataTransfer) {
@@ -5222,13 +5411,6 @@
           objectList.appendChild(itemRow);
         }
 
-        const windowTailDrop = document.createElement("div");
-        windowTailDrop.className = "object-row object-list-tail-drop";
-        if (indent) windowTailDrop.classList.add("group-child-row");
-        if (sceneHidden) windowTailDrop.classList.add("scene-hidden");
-        windowTailDrop.textContent = `↓ ${win.id || "(idなし)"} の末尾へ移動`;
-        bindObjectListRowDrop(windowTailDrop, { kind: "window", windowId: win.id, groupId: normalizeGroupId(win.groupId || ""), tail: true });
-        objectList.appendChild(windowTailDrop);
       }
     };
 
@@ -5268,7 +5450,6 @@
       row.dataset.objectKey = `group:${group.id}`;
       if (selected?.kind === "group" && selected.groupId === group.id) row.classList.add("active");
       row.appendChild(createObjectListControlStrip(
-        createObjectListDragHandle("このグループをドラッグ移動", () => ({ kind: "group", groupId: group.id })),
         createObjectListCollapseButton(collapsed, collapsed ? "グループを展開" : "グループを折りたたみ", () => toggleObjectListGroupCollapsed(group.id)),
         createObjectListVisibilityButton(group.visible !== false, group.visible === false ? "このグループを表示" : "このグループを非表示", () => {
           setGroupVisible(group.id, group.visible === false);
@@ -5323,6 +5504,7 @@
       row.draggable = true;
       row.addEventListener("dragstart", ev => {
         ev.stopPropagation();
+        setObjectListSelectionDuringDrag({ kind: "group", groupId: group.id }, row);
         const payload = { kind: "group", groupId: group.id };
         objectListDragPayload = payload;
         if (ev.dataTransfer) {
@@ -5342,12 +5524,6 @@
       objectList.appendChild(row);
       if (!collapsed) {
         renderWindowRows(groupWindows, true);
-        const groupTailDrop = document.createElement("div");
-        groupTailDrop.className = "object-row object-list-tail-drop group-child-row";
-        if (!inCurrentScene) groupTailDrop.classList.add("scene-hidden");
-        groupTailDrop.textContent = `↓ ${group.name || group.id} の末尾へ移動`;
-        bindObjectListRowDrop(groupTailDrop, { kind: "group", groupId: group.id, tail: true });
-        objectList.appendChild(groupTailDrop);
       }
     }
 
@@ -5524,6 +5700,8 @@
     if (type === "toggleGroupLock") { const group = groupById(command.groupId || ""); if (group) runStateMutation("一覧グループ位置ロック切替", () => { group.locked = group.locked !== true; }); return; }
     if (type === "toggleWindowLock") { const win = (state.windows || []).find(entry => entry.id === command.windowId); if (win) runStateMutation("一覧ウィンドウ位置ロック切替", () => { win.locked = win.locked !== true; }); return; }
     if (type === "toggleItemLock") { const win = (state.windows || []).find(entry => entry.id === command.windowId); const item = win?.items?.find(entry => entry.id === command.itemId); if (item) runStateMutation("一覧パーツ位置ロック切替", () => { item.locked = item.locked !== true; }); return; }
+    if (type === "reorderGroupByList") return reorderGroupByList(String(command.groupId || ""), String(command.targetGroupId || ""), String(command.position || "before"));
+    if (type === "moveWindowToGroupAt") return moveWindowToGroupAt(String(command.windowId || ""), String(command.groupId || ""), String(command.targetWindowId || ""), String(command.position || "after"));
     if (type === "moveWindowToGroup") return moveWindowToGroup(String(command.windowId || ""), String(command.groupId || ""));
     if (type === "moveItemToWindow") return moveItemToWindowAt(String(command.sourceWindowId || ""), String(command.itemId || ""), String(command.targetWindowId || ""), String(command.targetItemId || ""), String(command.position || "after"));
     if (type === "moveItemToGroup") return moveItemToGroupAt(String(command.sourceWindowId || ""), String(command.itemId || ""), String(command.groupId || ""), String(command.position || "after"));
@@ -7829,7 +8007,17 @@ ${choiceRuleStructComment()}
       addTextInput("縁取り色", item.outlineColor || "", value => { item.outlineColor = value; }, "空欄で継承");
       addNumberInput("縁取り幅", item.outlineWidth ?? 0, value => { item.outlineWidth = Math.max(0, value); }, 0);
     } else if (item.type === "gauge") {
-      addNumberPair("幅", item.width || 220, "高さ", item.height || 14, (a, b) => { item.width = Math.max(1, a); item.height = Math.max(1, b); });
+      addNumberPair("幅", item.width || 220, "高さ", item.height || 14, (a, b) => {
+        item.width = Math.max(1, a);
+        item.height = Math.max(1, b);
+        syncOwnerSizePercent(item);
+      });
+      addNumberPair("幅率（%）", ownerSizePercent(item, "x"), "高さ率（%）", ownerSizePercent(item, "y"), (a, b) => {
+        applyOwnerSizePercent(item, a, b);
+      });
+      addButtonControl("原寸に戻す", () => {
+        applyOwnerSizePercent(item, 100, 100);
+      });
       addSelect("ゲージ種類", item.gaugeShape || item.gaugeType || "horizontal", [
         { value: "horizontal", label: "横ゲージ" },
         { value: "vertical", label: "縦ゲージ" },
@@ -7838,7 +8026,10 @@ ${choiceRuleStructComment()}
         item.gaugeShape = value;
         if (value === "vertical" && !["bottomToTop", "topToBottom"].includes(String(item.gaugeDirection || ""))) item.gaugeDirection = "bottomToTop";
         if (value === "horizontal" && !["leftToRight", "rightToLeft"].includes(String(item.gaugeDirection || ""))) item.gaugeDirection = "leftToRight";
-        if (value === "circle" && !["clockwise", "counterClockwise"].includes(String(item.gaugeDirection || ""))) item.gaugeDirection = "clockwise";
+        if (value === "circle") {
+          if (!["clockwise", "counterClockwise"].includes(String(item.gaugeDirection || ""))) item.gaugeDirection = "clockwise";
+          if (item.gaugeStartAngle === undefined || item.gaugeStartAngle === null || item.gaugeStartAngle === "") item.gaugeStartAngle = 0;
+        }
       });
       const shape = String(item.gaugeShape || item.gaugeType || "horizontal");
       const directionOptions = shape === "vertical" ? [
@@ -7852,6 +8043,10 @@ ${choiceRuleStructComment()}
         { value: "rightToLeft", label: "右から左へ" }
       ];
       addSelect("ゲージ方向", item.gaugeDirection || directionOptions[0].value, directionOptions, value => { item.gaugeDirection = value; });
+      if (shape === "circle") {
+        addNumberInput("開始角度(度)", item.gaugeStartAngle ?? 0, value => { item.gaugeStartAngle = value; }, -3600);
+        addInfo("円ゲージの開始角度です。0度は右方向、90度は下方向、180度は左方向、270度は上方向です。");
+      }
 
       addPropertyDivider("値");
       addSelect("値タイプ", item.valueType || "fixed", [
@@ -7879,12 +8074,12 @@ ${choiceRuleStructComment()}
         addPropertyDivider(title);
         addCheckbox("使う", layer.enabled === true, value => { layer.enabled = value; });
         addReadonly("選択中画像", layer.fileName ? `MZ画像パス: ${normalizeImageFolder(layer.folder)}/${layer.fileName}` : "未指定");
-        addButtonControl("画像を選択", () => openProjectImagePicker(layer));
+        addButtonControl("画像を選択", () => openProjectImagePicker(layer, { ownerItem: item, fitOwnerSize: true }));
         addSelect("表示方法", layer.mode || "stretch", ["stretch", "cover", "contain"], value => { layer.mode = value; });
         addNumberInput("不透明度", layer.opacity ?? 255, value => { layer.opacity = clamp(value, 0, 255); }, 0);
       };
       addGaugeImagePicker("ゲージ背景画像", "gaugeBackImage", "back", "ゲージの奥に表示する画像です。");
-      addGaugeImagePicker("ゲージ画像", "gaugeFillImage", "fill", "横/縦ゲージでは現在値の割合に応じて方向指定どおりにクリップ表示されます。円ゲージでは色描画を使います。");
+      addGaugeImagePicker("ゲージ画像", "gaugeFillImage", "fill", "現在値の割合に応じて方向指定どおりにクリップ表示されます。円ゲージでも反映されます。");
       addGaugeImagePicker("ゲージ装飾画像", "gaugeFrontImage", "front", "ゲージの手前に重ねる飾り画像です。");
     } else if (item.type === "choiceList") {
       item.choiceMode = item.choiceMode || "command";
@@ -8019,7 +8214,17 @@ ${choiceRuleStructComment()}
       addNumberInput("選択時コモンイベントID", opt.commonEventId || 0, value => { opt.commonEventId = Math.max(0, value); });
       addTextarea("選択時スクリプト", opt.scriptOnSelect || "", value => { opt.scriptOnSelect = value; });
     } else if (item.type === "button") {
-      addNumberPair("幅", item.width || 120, "高さ", item.height || 36, (a, b) => { item.width = Math.max(1, a); item.height = Math.max(1, b); });
+      addNumberPair("幅", item.width || 120, "高さ", item.height || 36, (a, b) => {
+        item.width = Math.max(1, a);
+        item.height = Math.max(1, b);
+        syncOwnerSizePercent(item);
+      });
+      addNumberPair("幅率（%）", ownerSizePercent(item, "x"), "高さ率（%）", ownerSizePercent(item, "y"), (a, b) => {
+        applyOwnerSizePercent(item, a, b);
+      });
+      addButtonControl("原寸に戻す", () => {
+        applyOwnerSizePercent(item, 100, 100);
+      });
 
       addPropertyDivider("ボタン種類");
       addSelect("種類", item.buttonVisualMode || "normal", [
@@ -8061,7 +8266,7 @@ ${choiceRuleStructComment()}
           addReadonly("選択中名前ID", imgDef.presetId || "未指定");
           addReadonly("MZ画像パス", imgDef.fileName ? `${imgDef.folder}/${imgDef.fileName}` : "未指定");
         } else {
-          addButtonControl(`${label}画像を選択`, () => openProjectImagePicker(imgDef));
+          addButtonControl(`${label}画像を選択`, () => openProjectImagePicker(imgDef, { ownerItem: item, fitOwnerSize: true }));
           addReadonly("選択中画像", imgDef.fileName ? imageSelectionLabel(imgDef) : "未指定");
         }
         addNumberInput(`${label}画像不透明度`, imgDef.opacity ?? 255, value => { imgDef.opacity = clamp(value, 0, 255); }, 0, 255);
@@ -8086,6 +8291,14 @@ ${choiceRuleStructComment()}
 
       addPropertyDivider("統合画像の拡大率・不透明度");
       addNumberPair("X拡大率（%）", imageScalePercent(item, "scaleX"), "Y拡大率（%）", imageScalePercent(item, "scaleY"), (a, b) => { setImageScalePercent(item, "scaleX", a); setImageScalePercent(item, "scaleY", b); });
+      addButtonControl("原寸に戻す", () => {
+        const naturalW = Math.max(1, Number(bounds.width || item.width || 1));
+        const naturalH = Math.max(1, Number(bounds.height || item.height || 1));
+        item.width = naturalW;
+        item.height = naturalH;
+        setImageScalePercent(item, "scaleX", 100);
+        setImageScalePercent(item, "scaleY", 100);
+      });
       addNumberInput("不透明度", item.opacity ?? 255, value => { item.opacity = clamp(value, 0, 255); }, 0, 255);
 
       addPropertyDivider("PSD / 名前ID 呼び出し");
@@ -8125,6 +8338,12 @@ ${choiceRuleStructComment()}
 
       addPropertyDivider("画像の拡大率・不透明度");
       addNumberPair("X拡大率（%）", imageScalePercent(item, "scaleX"), "Y拡大率（%）", imageScalePercent(item, "scaleY"), (a, b) => { setImageScalePercent(item, "scaleX", a); setImageScalePercent(item, "scaleY", b); });
+      addButtonControl("原寸に戻す", () => {
+        item.width = Math.max(1, Number(item.previewNaturalWidth || item.width || 1));
+        item.height = Math.max(1, Number(item.previewNaturalHeight || item.height || 1));
+        setImageScalePercent(item, "scaleX", 100);
+        setImageScalePercent(item, "scaleY", 100);
+      });
       addNumberInput("不透明度", item.opacity ?? 255, value => { item.opacity = clamp(value, 0, 255); }, 0, 255);
     }
   }
@@ -8523,7 +8742,66 @@ ${choiceRuleStructComment()}
     render();
   }
 
-  function applyImageSelection(item, info) {
+  function ownerOverlayImageDefs(ownerItem) {
+    if (!ownerItem || typeof ownerItem !== "object") return [];
+    if (ownerItem.type === "gauge") {
+      return [
+        ensureGaugeImageLayer(ownerItem, "gaugeBackImage", "back"),
+        ensureGaugeImageLayer(ownerItem, "gaugeFillImage", "fill"),
+        ensureGaugeImageLayer(ownerItem, "gaugeFrontImage", "front")
+      ].filter(Boolean);
+    }
+    if (ownerItem.type === "button" && String(ownerItem.buttonVisualMode || "normal") !== "normal") {
+      const images = ensureButtonImages(ownerItem);
+      return Object.values(images || {}).filter(def => def && typeof def === "object");
+    }
+    return [];
+  }
+
+  function ownerOverlayNaturalSize(ownerItem) {
+    const defs = ownerOverlayImageDefs(ownerItem);
+    let maxW = 0;
+    let maxH = 0;
+    for (const def of defs) {
+      maxW = Math.max(maxW, Math.max(0, Number(def?.previewNaturalWidth || 0)));
+      maxH = Math.max(maxH, Math.max(0, Number(def?.previewNaturalHeight || 0)));
+    }
+    if (maxW > 0 && maxH > 0 && ownerItem && typeof ownerItem === "object") {
+      ownerItem.sizeNaturalWidth = Math.max(1, Math.round(maxW));
+      ownerItem.sizeNaturalHeight = Math.max(1, Math.round(maxH));
+    }
+    if (maxW <= 0) maxW = Math.max(1, Number(ownerItem?.sizeNaturalWidth || ownerItem?.width || 1));
+    if (maxH <= 0) maxH = Math.max(1, Number(ownerItem?.sizeNaturalHeight || ownerItem?.height || 1));
+    return { width: maxW, height: maxH };
+  }
+
+  function ownerSizePercent(ownerItem, axis) {
+    const natural = ownerOverlayNaturalSize(ownerItem);
+    const current = axis === "y"
+      ? Math.max(1, Number(ownerItem?.height || natural.height || 1))
+      : Math.max(1, Number(ownerItem?.width || natural.width || 1));
+    const base = axis === "y" ? Math.max(1, natural.height) : Math.max(1, natural.width);
+    return Math.max(1, Math.round((current / base) * 10000) / 100);
+  }
+
+  function syncOwnerSizePercent(ownerItem) {
+    if (!ownerItem || typeof ownerItem !== "object") return;
+    ownerItem.sizeScaleXPercent = ownerSizePercent(ownerItem, "x");
+    ownerItem.sizeScaleYPercent = ownerSizePercent(ownerItem, "y");
+  }
+
+  function applyOwnerSizePercent(ownerItem, xPercent, yPercent) {
+    if (!ownerItem || typeof ownerItem !== "object") return;
+    const natural = ownerOverlayNaturalSize(ownerItem);
+    const nx = Math.max(1, Number(xPercent) || 100);
+    const ny = Math.max(1, Number(yPercent) || 100);
+    ownerItem.sizeScaleXPercent = nx;
+    ownerItem.sizeScaleYPercent = ny;
+    ownerItem.width = Math.max(1, Math.round(Math.max(1, natural.width) * (nx / 100)));
+    ownerItem.height = Math.max(1, Math.round(Math.max(1, natural.height) * (ny / 100)));
+  }
+
+  function applyImageSelection(item, info, options = {}) {
     // 大文字小文字を含む実際の相対パスを保持する。デプロイ先が大小文字を区別する場合にも安全。
     const oldFolder = normalizeImageFolder(item.folder || "pictures") || "pictures";
     const oldFileName = stripImageExtension(item.fileName || "");
@@ -8564,10 +8842,22 @@ ${choiceRuleStructComment()}
       item.scaleX = Math.round((Number(item.scaleXPercent || 100) / 100) * 10000) / 10000;
       item.scaleY = Math.round((Number(item.scaleYPercent || 100) / 100) * 10000) / 10000;
     }
+    const ownerItem = options?.ownerItem && typeof options.ownerItem === "object" ? options.ownerItem : null;
+    if (changedImage && ownerItem && options?.fitOwnerSize === true) {
+      const defs = ownerOverlayImageDefs(ownerItem);
+      let maxW = Math.max(1, Number(item.previewNaturalWidth || 1));
+      let maxH = Math.max(1, Number(item.previewNaturalHeight || 1));
+      for (const def of defs) {
+        maxW = Math.max(maxW, Math.max(1, Number(def.previewNaturalWidth || 0)));
+        maxH = Math.max(maxH, Math.max(1, Number(def.previewNaturalHeight || 0)));
+      }
+      ownerItem.width = maxW;
+      ownerItem.height = maxH;
+    }
     if (Object.prototype.hasOwnProperty.call(item, "enabled")) item.enabled = true;
   }
 
-  function openProjectImagePicker(item) {
+  function openProjectImagePicker(item, options = {}) {
     if (!projectAssets.loaded || projectAssets.images.size <= 0) {
       showToast("先に上部の『ツクールプロジェクト読込』でプロジェクトフォルダを読み込んでください");
       debugLog("warn", "画像選択ダイアログを開けません。ツクールプロジェクトが未読込です。", { loaded: projectAssets.loaded, imageCount: projectAssets.images.size });
@@ -8664,7 +8954,7 @@ ${choiceRuleStructComment()}
                 naturalWidth: probe.naturalWidth || 96,
                 naturalHeight: probe.naturalHeight || 64,
                 forcePreviewSrc: false
-              });
+              }, options);
             });
             debugLog("info", "プロジェクト画像を選択しました。", { folder: assetFolder, fileName: assetName, key, naturalWidth: probe.naturalWidth, naturalHeight: probe.naturalHeight });
             overlay.remove();
@@ -8677,7 +8967,7 @@ ${choiceRuleStructComment()}
                 url: asset.url,
                 displayName: `${assetFolder}/${assetName}`,
                 forcePreviewSrc: false
-              });
+              }, options);
             });
             debugLog("warn", "プロジェクト画像のサイズ取得に失敗しましたが、選択自体は反映しました。", { folder: assetFolder, fileName: assetName, key });
             overlay.remove();
@@ -11119,39 +11409,40 @@ ${choiceRuleStructComment()}
 
   // 現在フォーカス中のウィンドウまたはパーツを削除します。
   // 削除直後でも Ctrl+Z で復元できるため、キーボード操作時は確認ダイアログを出しません。
-  function deleteSelectedObject() {
+  function deleteSelectedObject(options = {}) {
+    const silent = options?.silent === true;
     if (!selected) {
-      showToast("削除するウィンドウまたはパーツを選択してください");
+      if (!silent) showToast("削除するウィンドウまたはパーツを選択してください");
       return false;
     }
     if (selected.kind === "group") {
       const group = selectedGroup();
       if (!group) {
-        showToast("選択中のグループが見つかりません");
+        if (!silent) showToast("選択中のグループが見つかりません");
         return false;
       }
       deleteGroup(group.id);
-      showToast("グループと所属ウィンドウを削除しました（Ctrl+Zで復元）");
+      if (!silent) showToast("グループと所属ウィンドウを削除しました（Ctrl+Zで復元）");
       return true;
     }
     if (selected.kind === "window") {
       const win = selectedWindow();
       if (!win) {
-        showToast("選択中のウィンドウが見つかりません");
+        if (!silent) showToast("選択中のウィンドウが見つかりません");
         return false;
       }
       deleteWindow(win.id);
-      showToast("ウィンドウを削除しました（Ctrl+Zで復元）");
+      if (!silent) showToast("ウィンドウを削除しました（Ctrl+Zで復元）");
       return true;
     }
     const win = selectedWindow();
     const item = selectedItem();
     if (!win || !item) {
-      showToast("選択中のパーツが見つかりません");
+      if (!silent) showToast("選択中のパーツが見つかりません");
       return false;
     }
     deleteItem(win.id, item.id);
-    showToast("パーツを削除しました（Ctrl+Zで復元）");
+    if (!silent) showToast("パーツを削除しました（Ctrl+Zで復元）");
     return true;
   }
 
@@ -11225,7 +11516,7 @@ ${choiceRuleStructComment()}
     const base = { type, id: uid(type), displayName: "", x: 16, y: 16, zOrder: 0, visible: true, allowOutsideWindow: false };
     if (type === "text") Object.assign(base, { text: "テキスト", fontSize: 22, width: 180, color: "", align: "left" });
     if (type === "log") Object.assign(base, createDefaultLogItem());
-    if (type === "gauge") Object.assign(base, { width: 220, height: 14, gaugeShape: "horizontal", gaugeDirection: "leftToRight", valueType: "fixed", value: 50, max: 100, label: "", color1: "#ff6060", color2: "#ffa0a0", gaugeBackImage: createDefaultGaugeImageLayer("back"), gaugeFillImage: createDefaultGaugeImageLayer("fill"), gaugeFrontImage: createDefaultGaugeImageLayer("front") });
+    if (type === "gauge") Object.assign(base, { width: 220, height: 14, gaugeShape: "horizontal", gaugeDirection: "leftToRight", gaugeStartAngle: 0, valueType: "fixed", value: 50, max: 100, label: "", color1: "#ff6060", color2: "#ffa0a0", gaugeBackImage: createDefaultGaugeImageLayer("back"), gaugeFillImage: createDefaultGaugeImageLayer("fill"), gaugeFrontImage: createDefaultGaugeImageLayer("front") });
     if (type === "button") Object.assign(base, { width: 120, height: 36, text: options.text ?? "OK", buttonVisualMode: options.buttonVisualMode || "normal", commonEventId: 0, switchId: 0, variableId: 0, variableValue: 0, script: "", buttonStates: { mouseOff: createDefaultButtonState(), mouseOn: createDefaultButtonState(), press: createDefaultButtonState(), release: createDefaultButtonState() }, buttonImages: { mouseOff: createButtonImageDef(), mouseOn: createButtonImageDef(), press: createButtonImageDef(), release: createButtonImageDef() }, buttonStateEdit: "mouseOn" });
     if (type === "choiceList") Object.assign(base, createDefaultChoiceListItem(options.choiceMode || "tool"));
     if (type === "imageChoiceList") Object.assign(base, createDefaultImageChoiceListItem());
@@ -11315,10 +11606,11 @@ ${choiceRuleStructComment()}
     showToast("パーツを複製しました");
   }
 
-  function copyGroupToClipboard(groupId) {
+  function copyGroupToClipboard(groupId, options = {}) {
+    const silent = options?.silent === true;
     const group = groupById(groupId || "");
     if (!group) {
-      showToast("コピーするグループが見つかりません");
+      if (!silent) showToast("コピーするグループが見つかりません");
       return false;
     }
     objectClipboard = {
@@ -11329,24 +11621,25 @@ ${choiceRuleStructComment()}
       }
     };
     syncDetachedObjectListWindow();
-    showToast("グループをコピーしました");
+    if (!silent) showToast("グループをコピーしました");
     return true;
   }
 
-  function copySelectedObject() {
+  function copySelectedObject(options = {}) {
+    const silent = options?.silent === true;
     if (!selected) {
-      showToast("コピーするウィンドウ、グループ、またはパーツを選択してください");
+      if (!silent) showToast("コピーするウィンドウ、グループ、またはパーツを選択してください");
       return false;
     }
     if (selected.kind === "group") {
-      return copyGroupToClipboard(selected.groupId);
+      return copyGroupToClipboard(selected.groupId, { silent });
     }
     if (selected.kind === "window") {
       const win = selectedWindow();
       if (!win) return false;
       objectClipboard = { kind: "window", data: cloneForHistory(win) };
       syncDetachedObjectListWindow();
-      showToast("ウィンドウをコピーしました");
+      if (!silent) showToast("ウィンドウをコピーしました");
       return true;
     }
     const win = selectedWindow();
@@ -11354,7 +11647,20 @@ ${choiceRuleStructComment()}
     if (!win || !item) return false;
     objectClipboard = { kind: "item", sourceWindowId: win.id, data: cloneForHistory(item) };
     syncDetachedObjectListWindow();
-    showToast("パーツをコピーしました");
+    if (!silent) showToast("パーツをコピーしました");
+    return true;
+  }
+
+  function cutSelectedObject() {
+    if (!selected) {
+      showToast("切り取りするウィンドウ、グループ、またはパーツを選択してください");
+      return false;
+    }
+    const copied = copySelectedObject({ silent: true });
+    if (!copied) return false;
+    const cut = deleteSelectedObject({ silent: true });
+    if (!cut) return false;
+    showToast("切り取りしました（Ctrl+Vで貼り付け / Ctrl+Zで戻せます）");
     return true;
   }
 
@@ -11571,7 +11877,9 @@ ${choiceRuleStructComment()}
       const displayW = Math.max(1, Math.round(drag.startW + dx));
       const displayH = Math.max(1, Math.round(drag.startH + dy));
       const itemType = String(drag.itemType || item.type || "");
-      if (drag.scaleResize || itemType === "image" || itemType === "compositeImage") {
+      const isImageScaleType = drag.scaleResize || itemType === "image" || itemType === "compositeImage";
+      const isImageButtonResize = itemType === "button" && String(item.buttonVisualMode || "normal") !== "normal";
+      if (isImageScaleType) {
         const startW = Math.max(1, Number(drag.startW || 1));
         const startH = Math.max(1, Number(drag.startH || 1));
         let ratioX = displayW / startW;
@@ -11587,6 +11895,19 @@ ${choiceRuleStructComment()}
         const startScaleY = Math.max(1, Number(drag.startScaleYPercent || imageScalePercent(item, "scaleY")) || 100);
         setImageScalePercent(item, "scaleX", Math.max(1, Math.round(startScaleX * ratioX)));
         setImageScalePercent(item, "scaleY", Math.max(1, Math.round(startScaleY * ratioY)));
+      } else if (isImageButtonResize) {
+        let nextW = displayW;
+        let nextH = displayH;
+        if (!ev.shiftKey) {
+          const baseAspect = Math.max(0.01, Number(drag.startW || 1) / Math.max(1, Number(drag.startH || 1)));
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            nextH = Math.max(1, Math.round(nextW / baseAspect));
+          } else {
+            nextW = Math.max(1, Math.round(nextH * baseAspect));
+          }
+        }
+        item.width = Math.max(1, nextW);
+        item.height = Math.max(1, nextH);
       } else {
         item.width = displayW;
         item.height = displayH;
@@ -13025,6 +13346,7 @@ ${e?.message || String(e)}`);
     if (!globalPartPositionLocked) hits = hitInsideCandidatesAtPoint(ev.clientX, ev.clientY);
     if (!hits.length && !globalWindowPositionLocked) hits = hitWindowsAtPoint(ev.clientX, ev.clientY);
     if (hits.length === 0) return;
+    if (tryBeginFocusedInlineEditFromCapture(ev, hits)) return;
     if (hits.length <= 1) return;
 
     // 子要素側のpointerdownが最前面を選び直してしまわないよう、ここで止めます。
@@ -13309,7 +13631,7 @@ ${e?.message || String(e)}`);
             description: "状態ごとに画像を指定できるボタンです。通常/マウスON/押下/離すで画像を切り替えられます。",
             action: () => {
               const item = addItem("button", { buttonVisualMode: "image", text: "" });
-              setTimeout(() => openProjectImagePicker(ensureButtonImages(item).mouseOff), 0);
+              setTimeout(() => openProjectImagePicker(ensureButtonImages(item).mouseOff, { ownerItem: item, fitOwnerSize: true }), 0);
             }
           },
           {
@@ -13681,6 +14003,9 @@ ${e?.message || String(e)}`);
         return;
       case "copy":
         copySelectedObject();
+        return;
+      case "cut":
+        cutSelectedObject();
         return;
       case "template:save":
         saveObjectTemplate(target || selected);
@@ -14104,6 +14429,11 @@ ${e?.message || String(e)}`);
     if (key === "c") {
       ev.preventDefault();
       copySelectedObject();
+      return;
+    }
+    if (key === "x") {
+      ev.preventDefault();
+      cutSelectedObject();
       return;
     }
     if (key === "v") {

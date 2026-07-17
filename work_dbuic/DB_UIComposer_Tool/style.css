@@ -419,6 +419,64 @@ h1, h2, p { margin: 0; }
   outline-offset: 2px;
 }
 
+.ui-item.preview-inline-editing {
+  outline: 2px solid rgba(122,162,247,.88);
+  outline-offset: 2px;
+}
+
+.ui-item.preview-inline-editing.ui-text {
+  color: transparent !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 transparent !important;
+  paint-order: normal !important;
+}
+
+.ui-item.preview-inline-editing.ui-log {
+  color: transparent !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 transparent !important;
+  paint-order: normal !important;
+}
+
+.ui-item.preview-inline-editing > *:not(.preview-inline-text-editor) {
+  visibility: hidden !important;
+}
+
+.preview-inline-text-editor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  resize: none;
+  z-index: 6;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-shadow: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  caret-color: #f4f8ff;
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(122,162,247,.48);
+}
+
+.preview-inline-text-editor-text {
+  overflow: hidden;
+}
+
+.preview-inline-text-editor-log {
+  background: rgba(0,0,0,.14);
+  padding: 2px 4px;
+}
+
 .ui-text {
   color: white;
   white-space: pre;
@@ -2300,18 +2358,6 @@ body.panel-resizing * {
 .object-row.dragging {
   opacity: .45;
 }
-.object-row.object-list-tail-drop {
-  min-height: 24px;
-  font-size: 11px;
-  color: #9da8bd;
-  justify-content: center;
-  border-style: dashed;
-}
-.object-row.object-list-tail-drop.drop-before,
-.object-row.object-list-tail-drop.drop-after,
-.object-row.object-list-tail-drop.drop-into {
-  color: #dce9ff;
-}
 .scene-placeholder-icon {
   pointer-events: none;
 }
@@ -3224,6 +3270,15 @@ body.panel-resizing * {
   font-size: 10px;
   font-weight: 800;
   pointer-events: none;
+}
+
+/* v0.4.13: 選択中の行は常時分かるように強調表示を維持する */
+.left-panel .object-row.active,
+.object-row.active {
+  color: #f3f8ff !important;
+  border-color: rgba(122,162,247,.95) !important;
+  background: rgba(74, 105, 168, .26) !important;
+  box-shadow: inset 0 0 0 1px rgba(122,162,247,.70), 0 0 14px rgba(122,162,247,.35);
 }
 .property-info:has(+ .property-info) {}
 

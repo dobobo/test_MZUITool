@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DB_UIComposer Tool v0.3.98</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand-block">
+      <h1>DB_UIComposer Tool <span>v0.3.98</span></h1>
+      <p>RPGツクールMZ用 UI配置プレビュー → JSON / 実行スクリプト出力</p>
+    </div>
+    <div class="top-mode-switch" aria-label="位置ロック切替">
+      <label class="top-check mode-lock-check" title="ONの間はウィンドウ本体の移動・リサイズを禁止します。">
+        <input id="windowPositionLockInput" type="checkbox">ウィンドウ位置ロック
+      </label>
+      <label class="top-check mode-lock-check" title="ONの間はパーツの移動・リサイズを禁止します。">
+        <input id="partPositionLockInput" type="checkbox">パーツ位置ロック
+      </label>
+      <label class="top-check" title="選択中のウィンドウ/グループ以外を半透明にします。">
+        <input id="previewFocusDimInput" type="checkbox" checked>対象以外を半透明
+      </label>
+      <div class="top-add-toolbar" aria-label="要素追加・編集">
+        <button id="addWindowBtn" class="icon-add-button" title="ウィンドウ系パーツを選択" aria-label="ウィンドウ系パーツを選択">▣</button>
+        <button id="addTextBtn" class="icon-add-button" title="文字系パーツを選択" aria-label="文字系パーツを選択">T</button>
+        <button id="addGaugeBtn" class="icon-add-button" title="ゲージ系パーツを選択" aria-label="ゲージ系パーツを選択">▰</button>
+        <button id="addButtonBtn" class="icon-add-button" title="ボタン系パーツを選択" aria-label="ボタン系パーツを選択">□</button>
+        <button id="addChoiceBtn" class="icon-add-button" title="選択肢系パーツを選択" aria-label="選択肢系パーツを選択">☰</button>
+        <button id="addImageBtn" class="icon-add-button" title="画像系パーツを選択" aria-label="画像系パーツを選択">🖼</button>
+        <span class="top-toolbar-divider" aria-hidden="true"></span>
+        <button id="undoBtn" class="icon-add-button icon-edit-button" title="元に戻す（Ctrl+Z）" aria-label="元に戻す">↶</button>
+        <button id="redoBtn" class="icon-add-button icon-edit-button" title="やり直す（Ctrl+Shift+Z）" aria-label="やり直す">↷</button>
+        <button id="duplicateBtn" class="icon-add-button icon-edit-button" title="選択中のオブジェクトを複製（Ctrl+D）" aria-label="選択中のオブジェクトを複製">⧉</button>
+        <div id="partVariantPalette" class="part-variant-palette" hidden></div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="loadProjectBtn" title="RPGツクールMZのプロジェクトフォルダを読み込み、画像・フォント・Window.pngをプレビューに反映します。">ツクールプロジェクト読込</button>
+      <input id="projectFolderInput" type="file" webkitdirectory directory multiple hidden>
+      <input id="psdImportInput" type="file" accept=".psd,application/octet-stream" hidden>
+      <button id="debugConsoleBtn" class="console-button" title="ツール内デバッグコンソールを表示します。">コンソール</button>
+      <button id="saveCatalogPluginBtn" title="現在のレイアウトからカタログJSを保存します。初回保存後は通常の保存ボタンでも自動更新します。">カタログJS保存</button>
+      <button id="copyScriptBtn" class="primary top-copy-script-button" title="MZのイベントコマンド『スクリプト』に貼り付けるコードをコピーします。">MZスクリプトをコピー</button>
+      <button id="openCompositePresetManagerTopBtn" title="PSDごとの統合画像プリセットを独立管理します。メイン上の統合画像パーツには依存しません。">統合画像プリセット管理</button>
+      <button id="saveLocalBtn" title="現在のツールデータを保存します（Ctrl+S）。保存先が未指定の場合は新規保存ダイアログを開きます。">保存</button>
+      <button id="loadLocalBtn" title="保存したツールデータを読み込みます。対応ブラウザではプロジェクトも再読込します。">データ読込</button>
+      <button id="loadSampleBtn" title="同梱サンプルを現在のレイアウトへ読み込みます。">サンプル読込</button>
+      <input id="toolDataInput" type="file" accept=".json,application/json" hidden>
+      <button id="resetBtn" class="danger" title="現在の配置データを初期状態に戻します。">初期化</button>
+    </div>
+  </header>
+
+  <main class="app">
+    <aside class="panel left-panel">
+      <section class="collapsible-section" data-collapse-key="layout">
+        <h2><button type="button" class="section-toggle" aria-expanded="true"><span class="section-chevron">▾</span><span>レイアウト</span></button></h2>
+        <div class="section-body">
+        <label>レイアウトID<input id="layoutIdInput" type="text"></label>
+        <div class="grid2">
+          <label>画面幅<input id="screenWidthInput" type="number" min="1"></label>
+          <label>画面高さ<input id="screenHeightInput" type="number" min="1"></label>
+        </div>
+        <button id="applyScreenBtn" title="入力した画面幅・画面高さをプレビューに反映します。">画面サイズ反映</button>
+        </div>
+      </section>
+
+
+      <section class="collapsible-section" data-collapse-key="mz-preview">
+        <h2><button type="button" class="section-toggle" aria-expanded="true"><span class="section-chevron">▾</span><span>MZ連携 / プレビュー補正</span></button></h2>
+        <div class="section-body">
+        <div class="compact-status-row">
+          <span id="projectStatus" class="compact-status">未読込</span>
+        </div>
+        <div class="grid2">
+          <label>基本文字サイズ<input id="previewFontSizeInput" type="number" min="1"></label>
+          <label>行高さ<input id="previewLineHeightInput" type="number" min="1"></label>
+        </div>
+        <div class="grid2">
+          <label>内部余白<input id="previewPaddingInput" type="number" min="0"></label>
+          <label>文字Y補正<input id="previewTextYOffsetInput" type="number"></label>
+        </div>
+        <div class="grid2">
+          <label>基本文字色<input id="previewTextColorInput" type="text" placeholder="#ffffff / 空欄でMZ標準"></label>
+          <label>縁取り色<input id="previewOutlineColorInput" type="text" placeholder="例: rgba(0,0,0,0.85)"></label>
+        </div>
+        <label>縁取り幅<input id="previewOutlineWidthInput" type="number" min="0"></label>
+        <label class="check-row">Window.png風プレビュー<input id="useWindowSkinPreviewInput" type="checkbox"></label>
+        <label>変数プレビュー値<textarea id="previewVariablesInput" class="small-textarea" placeholder="1=75&#10;2=100"></textarea></label>
+        <div class="grid2">
+          <label>Actor HP<input id="previewActorHpInput" type="number"></label>
+          <label>Actor 最大HP<input id="previewActorMhpInput" type="number" min="1"></label>
+        </div>
+        <div class="grid2">
+          <label>Actor MP<input id="previewActorMpInput" type="number"></label>
+          <label>Actor 最大MP<input id="previewActorMmpInput" type="number" min="1"></label>
+        </div>
+        <label>Actor TP<input id="previewActorTpInput" type="number"></label>
+        <label title="ゲームには影響しない、ツールのプレビュー表示だけの拡大率です。">プレビュー拡大率(%)<input id="previewZoomPercentInput" type="number" min="10" step="5"></label>
+        <label title="クリック時の微小なマウスずれでオブジェクトが動かないよう、指定px以上動いたときだけドラッグを開始します。0で従来通り即ドラッグです。">ドラッグ開始距離(px)<input id="dragStartThresholdInput" type="number" min="0" step="1"></label>
+                <div class="compact-help-row">
+          <span>補正値は入力時に即時反映 / JSON保存</span>
+        </div>
+        </div>
+      </section>
+
+      <section class="collapsible-section object-list-section" data-collapse-key="object-list">
+        <h2 class="object-list-heading">
+          <button type="button" class="section-toggle object-list-section-toggle" aria-expanded="true"><span class="section-chevron">▾</span><span>一覧</span></button>
+          <button id="openDetachedListHeaderBtn" type="button" class="object-list-detach-button" title="一覧を別ウィンドウで開きます。ツールがアクティブな間だけ手前に出ます。">別枠表示</button>
+        </h2>
+        <div class="section-body">
+          <div id="objectList" class="object-list"></div>
+        </div>
+      </section>
+    </aside>
+
+    <div id="leftPanelSplitter" class="panel-splitter" title="左右にドラッグして左メニューの幅を変更します。ダブルクリックで初期幅に戻します。"></div>
+
+    <section class="workspace">
+      <div class="preview-toolbar">
+        <span id="currentSelection">選択: なし</span>
+        <span id="previewSizeLabel"></span>
+      </div>
+      <div class="preview-outer">
+        <div id="previewScaleWrap" class="preview-scale-wrap">
+          <div id="preview" class="preview"></div>
+        </div>
+      </div>
+    </section>
+
+    <div id="rightPanelSplitter" class="panel-splitter" title="左右にドラッグして右メニューの幅を変更します。ダブルクリックで初期幅に戻します。"></div>
+
+    <aside class="panel right-panel">
+      <section class="collapsible-section" data-collapse-key="properties">
+        <h2><button type="button" class="section-toggle" aria-expanded="true"><span class="section-chevron">▾</span><span>プロパティ</span></button></h2>
+        <div class="section-body">
+          <div id="properties" class="properties empty">オブジェクトを選択してください。</div>
+        </div>
+      </section>
+
+      <section class="collapsible-section" data-collapse-key="runtime-command">
+        <h2><button type="button" class="section-toggle" aria-expanded="true"><span class="section-chevron">▾</span><span>UI変更命令</span></button></h2>
+        <div class="section-body">
+          <div id="runtimeCommandPanel" class="runtime-command-panel empty">プレビューまたは一覧から、変更したいウィンドウ／パーツを選択してください。</div>
+          <button id="copyRuntimeCommandBtn" class="primary" title="選択中UIに対するゲーム中変更用のMZイベントコマンドをコピーします。ツクールMZのイベント実行内容欄へ貼り付けて使います。" disabled>MZ変更命令をコピー</button>
+        </div>
+      </section>
+
+      <section class="collapsible-section" data-collapse-key="json-import">
+        <h2><button type="button" class="section-toggle" aria-expanded="true"><span class="section-chevron">▾</span><span>JSON / MZスクリプト読込</span></button></h2>
+        <div class="section-body">
+          <textarea id="importJsonInput" class="small-textarea" placeholder="ここにJSONまたは「MZスクリプトをコピー」の内容を貼り付け"></textarea>
+          <button id="importJsonBtn" title="JSONまたはツールが出力したMZ実行スクリプトからレイアウトを読み込みます。">貼り付け内容を読み込む</button>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <dialog id="saveToolDataDialog" class="save-tool-data-dialog" aria-labelledby="saveToolDataDialogTitle">
+    <form method="dialog" class="save-tool-data-dialog-inner" onsubmit="return false;">
+      <h2 id="saveToolDataDialogTitle">ツールデータを新規保存</h2>
+      <p>保存するファイル名を指定してください。</p>
+      <label>ファイル名<input id="saveToolDataNameInput" type="text" spellcheck="false" autocomplete="off"></label>
+      <div class="save-tool-data-dialog-actions">
+        <button id="cancelSaveToolDataBtn" type="button">キャンセル</button>
+        <button id="confirmSaveToolDataBtn" type="button" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="debugConsole" class="debug-console" hidden>
+    <div class="debug-console-header">
+      <strong>デバッグコンソール</strong>
+      <span id="debugConsoleSummary">ログ 0件</span>
+      <button id="debugStateBtn">状態出力</button>
+      <button id="debugCopyBtn">コピー</button>
+      <button id="debugClearBtn">クリア</button>
+      <button id="debugCloseBtn">閉じる</button>
+    </div>
+    <div id="debugLogList" class="debug-log-list"></div>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script src="vendor/ag-psd.bundle.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

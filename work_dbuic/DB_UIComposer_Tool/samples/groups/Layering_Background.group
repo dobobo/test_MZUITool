@@ -1,0 +1,107 @@
+{
+  "id": "sampleLayeringBackgroundGroup",
+  "kind": "group",
+  "name": "Layering Background Group（ガイド→本文→背景）",
+  "savedAt": "sample",
+  "version": "0.4.29",
+  "data": {
+    "group": {
+      "id": "layering_group",
+      "name": "Layering Group",
+      "visible": true,
+      "locked": false
+    },
+    "windows": [
+      {
+        "id": "Layer_Guide_Window",
+        "groupId": "layering_group",
+        "x": 80,
+        "y": 328,
+        "width": 532,
+        "height": 64,
+        "opacity": 130,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 200,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "text",
+            "id": "Guide_Label",
+            "x": 12,
+            "y": 10,
+            "width": 500,
+            "text": "ガイド（最前面）。完成時は非表示。",
+            "fontSize": 14,
+            "color": "#ffe0a8",
+            "align": "left",
+            "zOrder": 100,
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "Layer_Content_Window",
+        "groupId": "layering_group",
+        "x": 86,
+        "y": 96,
+        "width": 520,
+        "height": 220,
+        "opacity": 220,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 0,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "text",
+            "id": "Content_Label",
+            "x": 18,
+            "y": 18,
+            "width": 420,
+            "text": "本文（中間レイヤー）",
+            "fontSize": 24,
+            "color": "#ffffff",
+            "align": "left",
+            "zOrder": 20,
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "Layer_BG_Window",
+        "groupId": "layering_group",
+        "x": 40,
+        "y": 40,
+        "width": 620,
+        "height": 360,
+        "opacity": 150,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": -200,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "dim",
+        "items": [
+          {
+            "type": "text",
+            "id": "BG_Label",
+            "x": 16,
+            "y": 16,
+            "width": 300,
+            "text": "背景（最背面）",
+            "fontSize": 20,
+            "color": "#a9bdd8",
+            "align": "left",
+            "zOrder": -10,
+            "visible": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "id": "sampleLayeringBasics",
+  "kind": "scene",
+  "name": "01_Layering_Basics：背景を後ろに置く標準構成",
+  "savedAt": "sample",
+  "version": "0.4.29",
+  "data": {
+    "scene": {
+      "id": "Layering_Basics",
+      "name": "Layering_Basics",
+      "groupIds": [
+        "guide_group",
+        "content_group",
+        "bg_group"
+      ],
+      "includeUngrouped": false
+    },
+    "groups": [
+      { "id": "guide_group", "name": "前面ガイド", "visible": true, "locked": false },
+      { "id": "content_group", "name": "本文", "visible": true, "locked": false },
+      { "id": "bg_group", "name": "背景", "visible": true, "locked": false }
+    ],
+    "windows": [
+      {
+        "id": "Guide_Window",
+        "groupId": "guide_group",
+        "x": 80,
+        "y": 488,
+        "width": 644,
+        "height": 82,
+        "opacity": 140,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 240,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "text",
+            "id": "Guide_Text",
+            "x": 14,
+            "y": 10,
+            "width": 604,
+            "text": "このウィンドウは説明用（前面）です。完成時は非表示にしてください。",
+            "fontSize": 15,
+            "color": "#ffe0a8",
+            "align": "left",
+            "zOrder": 100,
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "Content_Window",
+        "groupId": "content_group",
+        "x": 92,
+        "y": 120,
+        "width": 620,
+        "height": 340,
+        "opacity": 225,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 0,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "text",
+            "id": "Content_Title",
+            "x": 22,
+            "y": 14,
+            "width": 460,
+            "text": "本文ウィンドウ（zOrder: 0）",
+            "fontSize": 28,
+            "color": "#ffffff",
+            "align": "left",
+            "zOrder": 20,
+            "visible": true
+          },
+          {
+            "type": "text",
+            "id": "Content_Desc",
+            "x": 22,
+            "y": 64,
+            "width": 560,
+            "text": "背景は低いzOrder、本文は中間、ガイドは高いzOrderにすると\n前後関係の混乱を防げます。",
+            "fontSize": 17,
+            "color": "#d5e2f5",
+            "align": "left",
+            "zOrder": 30,
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "Background_Window",
+        "groupId": "bg_group",
+        "x": 24,
+        "y": 20,
+        "width": 768,
+        "height": 560,
+        "opacity": 160,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": -300,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "dim",
+        "items": [
+          {
+            "type": "text",
+            "id": "Background_Label",
+            "x": 24,
+            "y": 20,
+            "width": 520,
+            "text": "背景ウィンドウ（最背面）\n常に後ろへ置く基礎見本",
+            "fontSize": 22,
+            "color": "#bcd0ea",
+            "align": "left",
+            "zOrder": -10,
+            "visible": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.06 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.30 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -12,7 +12,31 @@
  * マップシーン上にウィンドウ、テキスト、画像、ゲージ、簡易ボタンを表示します。
  *
  * v0.4.05では、一覧ドラッグの末尾ドロップ判定を追加し、移動先が直感的になるよう改善しています。
- * v0.4.06では、左メニューへシーン削除ボタンを追加し、シーン削除時に所属グループ/ウィンドウ/パーツもまとめて削除するよう調整しています。
+ * v0.4.06では、同梱サンプルを説明重視の構成に更新し、学習しやすさを向上しています。
+ * v0.4.07では、末尾移動の判定を専用行ではなく行下端の境界判定へ変更し、レイヤー操作に近い体験へ調整しています。
+ * v0.4.08では、グループ/ウィンドウ行の中央ドロップを無効化し、上下境界帯のみ有効なレイヤー式判定へ調整しています。
+ * v0.4.09では、ウィンドウ移動時に他ウィンドウ配下のパーツ行の上下枠へドロップできる判定を追加しています。
+ * v0.4.10では、グループ移動時にもウィンドウ/パーツ行の上下枠ドロップで並び替えできるよう調整しています。
+ * v0.4.11では、一覧左端のドラッグハンドルを廃止し、行ドラッグのみで操作できるよう整理しています。
+ * v0.4.12では、別枠オブジェクト一覧でもグループ/ウィンドウ移動のドロップ判定をメイン一覧と同等に調整しています。
+ * v0.4.13では、ツール画面のバージョン表示を最新版へ同期し、一覧の選択ハイライトを常時見やすく強化しています。
+ * v0.4.14では、ドラッグ開始時に対象行を自動選択することで、選択状態と移動判定の挙動を統一しています。
+ * v0.4.15では、プレビュー上のテキスト/ログをダブルクリックで直接編集できるようにしています。
+ * v0.4.16では、重なり時のダブルクリック優先度を調整し、選択中テキストの直接編集を優先するようにしています。
+ * v0.4.17では、円ゲージの反時計回り描画ロジックを修正し、表示崩れを防いでいます。
+ * v0.4.18では、プレビュー上の直接文字編集を見た目・レイアウトに馴染む表示へ調整しています。
+ * v0.4.19では、円ゲージ画像レイヤーの反映と開始角度設定（既定0度）に対応しています。
+ * v0.4.20では、プレビュー直接文字編集中に元文字が残らないよう表示を調整しています。
+ * v0.4.21では、プレビュー文字編集中のアウトライン残りを解消するためストローク描画を抑制しています。
+ * v0.4.22では、ゲージ/画像ボタンの画像読込時に原寸反映し、画像系リサイズの比率固定挙動を統一しています。
+ * v0.4.23では、重なり画像の最大サイズを下回らないよう画像読込時のサイズ反映を調整しています。
+ * v0.4.24では、画像系パーツにサイズ％入力と原寸へ戻すボタンを追加し、幅/高さと連動するよう調整しています。
+ * v0.4.25では、Ctrl+X/C/V の切り取り・コピー・貼り付けショートカットを一覧操作に対応しています。
+ * v0.4.26では、プレビュー直接文字編集中に改行時の元文字残像が重ならないよう描画を修正しています。
+ * v0.4.27では、同梱サンプルをカテゴリ別に再構成し、背景を背面へ置く標準レイヤー順へ整理しています。
+ * v0.4.28では、一覧のグループ/ウィンドウ順と前後関係が一致するよう、描画順同期の向きを修正しています。
+ * v0.4.29では、一覧仕様をPhotoshop式（上ほど手前）へ戻し、サンプルの並び順を同仕様に合わせて調整しています。
+ * v0.4.30では、左メニューへシーン削除を追加し、削除時に所属グループ/ウィンドウ/パーツも一括削除する仕様にしています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -4114,14 +4138,13 @@
       return { value: toNumber(value, 0), max: Math.max(1, toNumber(max, 1)) };
     }
 
-    drawGaugeImageLayer(definition, x, y, width, height, clipRate = null, shape = "horizontal", direction = "leftToRight") {
+    drawGaugeImageLayer(definition, x, y, width, height, clipRate = null, shape = "horizontal", direction = "leftToRight", startAngleDeg = 0) {
       const def = Object.assign({ enabled: false, folder: "pictures", fileName: "", opacity: 255, mode: "stretch" }, definition || {});
       if (!def.enabled || !def.fileName) return false;
       if (clipRate === null) {
         this.drawImageLayer(def, x, y, width, height);
         return true;
       }
-      if (shape === "circle") return false;
 
       const oldContents = this.contents;
       const tempBitmap = new Bitmap(Math.max(1, width), Math.max(1, height));
@@ -4129,6 +4152,30 @@
       this.drawImageLayer(def, 0, 0, width, height);
       this.contents = oldContents;
       const rate = clamp(clipRate, 0, 1);
+      if (shape === "circle") {
+        if (rate <= 0) return true;
+        const ctx = this.contents && this.contents._context;
+        const canvas = tempBitmap && (tempBitmap._canvas || tempBitmap.canvas);
+        if (!ctx || !canvas) return false;
+        const cx = x + width / 2;
+        const cy = y + height / 2;
+        const radius = Math.max(1, Math.min(width, height) / 2);
+        const startRad = ((toNumber(startAngleDeg, 0) - 90) * Math.PI) / 180;
+        const sweep = Math.PI * 2 * rate * (direction === "counterClockwise" ? -1 : 1);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, startRad, startRad + sweep, direction === "counterClockwise");
+        ctx.closePath();
+        ctx.clip();
+        const oldAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = clamp(toNumber(def.opacity, 255), 0, 255) / 255;
+        ctx.drawImage(canvas, x, y, width, height);
+        ctx.globalAlpha = oldAlpha;
+        ctx.restore();
+        if (this.contents._baseTexture) this.contents._baseTexture.update();
+        return true;
+      }
       const oldPaintOpacity = this.contents.paintOpacity;
       this.contents.paintOpacity = 255;
       if (shape === "vertical") {
@@ -4195,14 +4242,14 @@
       this.contents.outlineWidth = oldOutlineWidth;
     }
 
-    drawCircleGaugeFill(x, y, width, height, rate, color1, color2, direction) {
+    drawCircleGaugeFill(x, y, width, height, rate, color1, color2, direction, startAngleDeg = 0) {
       const ctx = this.contents && this.contents._context;
       if (!ctx) return false;
       const cx = x + width / 2;
       const cy = y + height / 2;
       const radius = Math.max(1, Math.min(width, height) / 2);
       const inner = radius * 0.58;
-      const start = -Math.PI / 2;
+      const start = ((toNumber(startAngleDeg, 0) - 90) * Math.PI) / 180;
       const end = start + (direction === "counterClockwise" ? -1 : 1) * Math.PI * 2 * clamp(rate, 0, 1);
       ctx.save();
       ctx.beginPath();
@@ -4240,20 +4287,25 @@
       const color2 = String(item.color2 || "#ffa0a0");
       const shape = String(item.gaugeShape || item.gaugeType || "horizontal");
       const direction = String(item.gaugeDirection || (shape === "vertical" ? "bottomToTop" : shape === "circle" ? "clockwise" : "leftToRight"));
+      const startAngleDeg = toNumber(item.gaugeStartAngle, 0);
 
       const backImage = item.gaugeBackImage || {};
       const fillImage = item.gaugeFillImage || {};
       const frontImage = item.gaugeFrontImage || {};
 
       if (shape === "circle") {
-        this.drawCircleGaugeFill(x, y, width, height, rate, color1, color2, direction);
+        const backDrawn = this.drawGaugeImageLayer(backImage, x, y, width, height, null, shape, direction, startAngleDeg);
+        if (!backDrawn) this.drawCircleGaugeFill(x, y, width, height, 1, ColorManager.gaugeBackColor(), ColorManager.gaugeBackColor(), "clockwise", startAngleDeg);
+        const fillDrawn = this.drawGaugeImageLayer(fillImage, x, y, width, height, rate, shape, direction, startAngleDeg);
+        if (!fillDrawn) this.drawCircleGaugeFill(x, y, width, height, rate, color1, color2, direction, startAngleDeg);
+        this.drawGaugeImageLayer(frontImage, x, y, width, height, null, shape, direction, startAngleDeg);
       } else {
-        const backDrawn = this.drawGaugeImageLayer(backImage, x, y, width, height, null, shape, direction);
+        const backDrawn = this.drawGaugeImageLayer(backImage, x, y, width, height, null, shape, direction, startAngleDeg);
         if (!backDrawn) {
           this.contents.fillRect(x, y, width, height, ColorManager.gaugeBackColor());
         }
 
-        const fillDrawn = this.drawGaugeImageLayer(fillImage, x, y, width, height, rate, shape, direction);
+        const fillDrawn = this.drawGaugeImageLayer(fillImage, x, y, width, height, rate, shape, direction, startAngleDeg);
         if (!fillDrawn) {
           if (shape === "vertical") {
             const drawHeight = Math.floor(height * rate);
@@ -4266,7 +4318,7 @@
           }
         }
 
-        this.drawGaugeImageLayer(frontImage, x, y, width, height, null, shape, direction);
+        this.drawGaugeImageLayer(frontImage, x, y, width, height, null, shape, direction, startAngleDeg);
       }
 
       if (item.label) {
@@ -5720,7 +5772,7 @@
   });
 
   window.DB_UIComposer = {
-    version: "0.4.06",
+    version: "0.4.30",
     applyLayout,
     refreshScene,
     normalizeLayout,

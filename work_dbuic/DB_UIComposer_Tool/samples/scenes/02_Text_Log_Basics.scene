@@ -1,0 +1,98 @@
+{
+  "id": "sampleTextLogBasics",
+  "kind": "scene",
+  "name": "02_Text_Log_Basics：text/logカテゴリの基本",
+  "savedAt": "sample",
+  "version": "0.4.27",
+  "data": {
+    "scene": {
+      "id": "Text_Log_Basics",
+      "name": "Text_Log_Basics",
+      "groupIds": [
+        "textlog_group"
+      ],
+      "includeUngrouped": false
+    },
+    "groups": [
+      { "id": "textlog_group", "name": "Text/Log", "visible": true, "locked": false }
+    ],
+    "windows": [
+      {
+        "id": "Text_Log_Window",
+        "groupId": "textlog_group",
+        "x": 70,
+        "y": 56,
+        "width": 680,
+        "height": 500,
+        "opacity": 220,
+        "contentsOpacity": 255,
+        "layer": "mapUi",
+        "zOrder": 0,
+        "visible": true,
+        "frameVisible": true,
+        "backgroundType": "normal",
+        "items": [
+          {
+            "type": "text",
+            "id": "Text_Title",
+            "x": 20,
+            "y": 14,
+            "width": 560,
+            "text": "textカテゴリの見本（複数行・揃え・色）",
+            "fontSize": 27,
+            "color": "#ffffff",
+            "align": "left",
+            "zOrder": 10,
+            "visible": true
+          },
+          {
+            "type": "text",
+            "id": "Text_MultiLine",
+            "x": 20,
+            "y": 64,
+            "width": 620,
+            "text": "1行目：テキスト基本\n2行目：インライン編集の改行確認\n3行目：outline/color/fontSize調整対象",
+            "fontSize": 18,
+            "color": "#dce8ff",
+            "align": "left",
+            "zOrder": 20,
+            "visible": true
+          },
+          {
+            "type": "log",
+            "id": "Log_Preview",
+            "x": 20,
+            "y": 190,
+            "width": 620,
+            "height": 220,
+            "fontSize": 18,
+            "lineHeight": 30,
+            "color": "#ffffff",
+            "paddingX": 8,
+            "paddingY": 8,
+            "maxLines": 5,
+            "displayFrames": 180,
+            "fadeFrames": 30,
+            "moveFrames": 20,
+            "sampleText": "ログを追加しました。\nアイテムを入手しました。\nHPが10回復しました。\n目的地を更新しました。",
+            "zOrder": 30,
+            "visible": true
+          },
+          {
+            "type": "text",
+            "id": "Log_Guide",
+            "x": 20,
+            "y": 430,
+            "width": 620,
+            "text": "logカテゴリは AddItemLogText コマンド連携向けです。",
+            "fontSize": 15,
+            "color": "#b8d0f0",
+            "align": "left",
+            "zOrder": 40,
+            "visible": true
+          }
+        ]
+      }
+    ]
+  }
+}

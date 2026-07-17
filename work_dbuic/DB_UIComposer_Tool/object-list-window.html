@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DB_UIComposer 一覧</title>
+  <link rel="stylesheet" href="object-list-window.css">
+</head>
+<body>
+  <header class="detached-header">
+    <div>
+      <strong>一覧</strong>
+      <span id="statusText">未同期</span>
+    </div>
+    <button id="refreshHintBtn" type="button" title="メイン画面の操作に合わせて自動同期します">同期中</button>
+  </header>
+  <div class="detached-toolbar">
+    <select id="sceneSelect" title="プレビューに表示するシーン"></select>
+    <button id="addSceneBtn" type="button">＋シーン</button>
+    <button id="addGroupBtn" type="button">＋グループ</button>
+    <button id="saveSceneBtn" class="icon-file-button" type="button" title="現在のシーンをファイル保存"><img src="assets/hozon.png" alt="保存"></button>
+    <button id="loadSceneBtn" class="icon-file-button" type="button" title="シーンファイルを読み込み"><img src="assets/yomikomi.png" alt="読込"></button>
+    <button id="loadGroupBtn" class="icon-file-button" type="button" title="グループファイルを現在のシーンへ読み込み"><img src="assets/yomikomi.png" alt="読込"></button>
+  </div>
+  <main id="listRoot" class="detached-list"></main>
+  <script src="object-list-window.js"></script>
+</body>
+</html>
