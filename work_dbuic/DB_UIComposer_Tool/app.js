@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.38";
+  const TOOL_VERSION = "0.4.39";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -370,7 +370,7 @@
       gauge: "ゲージ",
       button: buttonVisualModeLabel(item?.buttonVisualMode),
       image: "通常画像",
-      compositeImage: "統合画像"
+      compositeImage: "複合画像"
     }[type] || type || "不明なパーツ";
   }
 
@@ -8386,10 +8386,10 @@ ${choiceRuleStructComment()}
     } else if (item.type === "compositeImage") {
       ensureCompositeImageLayers(item);
       const bounds = compositeImageBounds(item);
-      addInfo("複数画像を1つの表示物として重ね合わせる統合画像です。ゲーム内では構成差し替え・再表示・フェードイン用コマンドの対象にできます。");
+      addInfo("複数画像を1つの表示物として扱う複合画像です。ゲーム内では書き出し済みPNG（1枚絵）として表示できます。");
       addNumberPair("基準幅", Math.max(1, Number(item.width || bounds.width)), "基準高さ", Math.max(1, Number(item.height || bounds.height)), (a, b) => { item.width = Math.max(1, a); item.height = Math.max(1, b); });
 
-      addPropertyDivider("統合画像の拡大率・不透明度");
+      addPropertyDivider("複合画像の拡大率・不透明度");
       addNumberPair("X拡大率（%）", imageScalePercent(item, "scaleX"), "Y拡大率（%）", imageScalePercent(item, "scaleY"), (a, b) => { setImageScalePercent(item, "scaleX", a); setImageScalePercent(item, "scaleY", b); });
       addButtonControl("原寸に戻す", () => {
         runStateMutation("原寸に戻す", () => {
@@ -13804,20 +13804,13 @@ ${e?.message || String(e)}`);
           },
           {
             id: "compositeImage",
-            label: "統合画像",
+            label: "複合画像",
             icon: "🗂",
-            description: "複数画像を1つの表示として重ね合わせるパーツです。立ち絵差分や装飾の合成に向いています。",
+            description: "複数画像を1つに合成して扱うパーツです。ゲーム内では一枚絵として表示できます。",
             action: () => {
               const item = addItem("compositeImage");
               setTimeout(() => openProjectImagePicker(ensureCompositeImageLayers(item)[0]), 0);
             }
-          },
-          {
-            id: "psdImport",
-            label: "登録済み名前IDを挿入",
-            icon: "PSD",
-            description: "統合画像プリセット管理で登録済みのPSD / 名前IDを選び、プレビューしてからメインウィンドウへ挿入します。",
-            action: () => { openCompositePresetInsertPicker(); }
           }
         ]
       }

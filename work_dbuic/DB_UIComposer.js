@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.38 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.39 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -45,6 +45,7 @@
  * v0.4.36では、円ゲージの開始角度基準を0度=右方向へ統一し、円ゲージ画像の不要な円形クリップを解消しています。
  * v0.4.37では、プレビューの右クリック対象決定でフォーカス中パーツを優先し、手前パーツへの誤吸着を抑制しています。
  * v0.4.38では、円ゲージ開始角度の実機基準をツール表示と一致する基準へ再調整しています。
+ * v0.4.39では、複合画像はゲーム内で一枚絵（書き出しPNG）を優先表示し、レイヤー個別描画へのフォールバックを抑制しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -2678,10 +2679,7 @@
     const layers = parseCompositeLayersJson(layersJson);
     if (!layers) return false;
     return setRuntimeItemFields(layoutId, windowId, itemId, {
-      layers,
-      folder: "",
-      fileName: "",
-      bakedImage: null
+      layers
     }, "SetCompositeImageSet");
   };
 
@@ -4059,8 +4057,7 @@
     }
 
     drawDbCompositeImage(item) {
-      // MZ実行時出力では統合画像は基本的に書き出し済みPNGの image として扱われます。
-      // 通常JSONや実行時コマンドで compositeImage のまま来た場合だけ、ここでレイヤー描画します。
+      // 複合画像は、MZ実行時は書き出し済みPNG（1枚絵）として扱います。
       const baked = item.bakedImage || {};
       if (item.fileName || baked.fileName) {
         const imageItem = Object.assign({}, item, {
@@ -4073,62 +4070,8 @@
         this.drawDbImage(imageItem);
         return;
       }
-
-      const layers = normalizeCompositeImageLayers(item.layers)
-        .map((layer, index) => ({ layer, index }))
-        .filter(entry => entry.layer.visible !== false && entry.layer.fileName)
-        .sort((a, b) => {
-          const az = toNumber(a.layer.priority, a.layer.zOrder || 0);
-          const bz = toNumber(b.layer.priority, b.layer.zOrder || 0);
-          if (az !== bz) return az - bz;
-          return a.index - b.index;
-        });
-      if (!layers.length) return;
-
-      const baseOpacity = clamp(toNumber(item.opacity, 255), 0, 255);
-      const originX = toNumber(item.x, 0);
-      const originY = toNumber(item.y, 0);
-      const sx = imageScaleRate(item, "scaleX");
-      const sy = imageScaleRate(item, "scaleY");
-      const oldPaintOpacity = this.contents.paintOpacity;
-      const ctx = this.contents ? this.contents._context : null;
-      const oldComposite = ctx ? ctx.globalCompositeOperation : null;
-      let usedComposite = false;
-
-      for (const entry of layers) {
-        const layer = entry.layer;
-        const bitmap = this.imageBitmap(layer);
-        if (!bitmap) continue;
-        if (bitmap.isError && bitmap.isError()) {
-          console.warn("[DB_UIComposer] Composite layer image load failed", {
-            windowId: this._dbUiDefinition.id,
-            itemId: item.id,
-            layerId: layer.id,
-            folder: layer.folder,
-            fileName: layer.fileName
-          });
-          continue;
-        }
-        if (!bitmap.isReady()) {
-          bitmap.addLoadListener(() => { if (this.isDbUiAlive()) this.refresh(); });
-          continue;
-        }
-        const lw = Math.max(1, toNumber(layer.width, bitmap.width));
-        const lh = Math.max(1, toNumber(layer.height, bitmap.height));
-        const dx = Math.round(originX + toNumber(layer.x, 0) * sx);
-        const dy = Math.round(originY + toNumber(layer.y, 0) * sy);
-        const dw = Math.max(1, Math.round(lw * sx));
-        const dh = Math.max(1, Math.round(lh * sy));
-        this.contents.paintOpacity = Math.round(baseOpacity * clamp(toNumber(layer.opacity, 255), 0, 255) / 255);
-        if (ctx) {
-          ctx.globalCompositeOperation = compositeCanvasOperation(layer.blendMode);
-          usedComposite = true;
-        }
-        withDbUiImageSmoothing(this.contents, () => this.contents.blt(bitmap, 0, 0, bitmap.width, bitmap.height, dx, dy, dw, dh));
-      }
-      if (ctx) ctx.globalCompositeOperation = oldComposite || "source-over";
-      if (usedComposite && this.contents._baseTexture) this.contents._baseTexture.update();
-      this.contents.paintOpacity = oldPaintOpacity;
+      // 複合画像はゲーム内で一枚絵表示に統一します。
+      // 書き出しPNG未指定時は何も描かず、個別レイヤー描画には戻しません。
     }
 
     gaugeValues(item) {
