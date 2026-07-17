@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.41";
+  const TOOL_VERSION = "0.4.42";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -975,7 +975,54 @@
     item.exportPresetName = String(normalized.exportPresetName || normalized.id || "");
     item.compositePresets = [];
     ensureCompositeImageLayers(item);
+    applyCompositePresetBakedImage(item, lib, normalized);
     return true;
+  }
+
+  function compositePresetBakedImageForItem(item, library, preset) {
+    if (!item || item.type !== "compositeImage" || !library || !preset) return null;
+    const exported = preset.exportedImage || {};
+    const rect = compositeImageDrawRect(item);
+    const folder = normalizeImageFolder(exported.folder || `pictures/${COMPOSITE_EXPORT_ROOT_FOLDER}`) || `pictures/${COMPOSITE_EXPORT_ROOT_FOLDER}`;
+    const rawFileName = String(exported.fileName || libraryExportFileName(library, preset) || "");
+    const fileName = stripImageExtension(rawFileName);
+    if (!fileName) return null;
+    const ref = findProjectImage({ folder, fileName });
+    return {
+      folder,
+      fileName,
+      width: Math.max(1, Number(exported.width || rect.width || item.width || 96)),
+      height: Math.max(1, Number(exported.height || rect.height || item.height || 64)),
+      offsetX: Number(exported.offsetX ?? rect.minX ?? 0),
+      offsetY: Number(exported.offsetY ?? rect.minY ?? 0),
+      exportedAt: String(exported.exportedAt || ""),
+      layerCount: Math.max(1, Number(exported.layerCount || (item.layers || []).filter(layer => layer.visible !== false && layer.fileName).length || 1)),
+      previewSrc: ref?.url || String(exported.previewSrc || ""),
+      previewName: `${folder}/${fileName}`,
+      exportBaseName: compositeExportBaseName(item, findWindowByItemId(item.id)),
+      exportPresetName: compositeExportPresetName(item)
+    };
+  }
+
+  function applyCompositePresetBakedImage(item, library, preset) {
+    const baked = compositePresetBakedImageForItem(item, library, preset);
+    if (!baked) return;
+    item.bakedImage = baked;
+  }
+
+  function runtimeBakedImageForCompositeItem(item) {
+    const baked = item?.bakedImage || {};
+    if (baked.fileName) return baked;
+    const psdKey = String(item?.compositePresetPsdKey || "");
+    const presetId = String(item?.selectedPresetId || item?.compositePresetNameId || "");
+    if (!psdKey || !presetId) return null;
+    const libRaw = compositePresetLibraryByKey(psdKey);
+    if (!libRaw) return null;
+    const lib = normalizeCompositePresetLibrary(libRaw);
+    const preset = (lib.presets || []).find(entry => entry.id === presetId);
+    if (!preset) return null;
+    const virtualItem = Object.assign({}, item, { type: "compositeImage", layers: cloneForHistory(preset.layers || item.layers || []) });
+    return compositePresetBakedImageForItem(virtualItem, lib, preset);
   }
 
   function deleteCompositePresetLibraryByKey(psdKey) {
@@ -1701,7 +1748,7 @@
     for (const win of data.windows || []) {
       win.items = (win.items || []).map(item => {
         if (item.type !== "compositeImage") return item;
-        const baked = item.bakedImage || {};
+        const baked = runtimeBakedImageForCompositeItem(item) || {};
         if (!baked.fileName) return item;
         const out = Object.assign({}, item, {
           type: "image",
@@ -10280,6 +10327,9 @@ ${choiceRuleStructComment()}
       runStateMutation("統合画像プリセット変更", () => {
         applyLibraryPresetToCompositeItem(targetItem, normalized, preset, { keepPlacement: true });
       });
+      if (!preset.exportedImage?.fileName && projectAssets.loaded && projectAssets.directoryHandle) {
+        void exportCompositePresetPng(targetItem, preset).catch(() => {});
+      }
       showToast(`名前ID「${preset.id}」を適用しました`);
       return true;
     }
@@ -10328,6 +10378,9 @@ ${choiceRuleStructComment()}
       mode = "inside";
       selected = { kind: "item", windowId: win.id, itemId: item.id };
     });
+    if (!preset.exportedImage?.fileName && projectAssets.loaded && projectAssets.directoryHandle) {
+      void exportCompositePresetPng(item, preset).catch(() => {});
+    }
     updateModeButtons();
     showToast(`名前ID「${preset.id}」を挿入しました`);
     return true;
