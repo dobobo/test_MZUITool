@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.37";
+  const TOOL_VERSION = "0.4.38";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -8143,7 +8143,7 @@ ${choiceRuleStructComment()}
       addSelect("ゲージ方向", item.gaugeDirection || directionOptions[0].value, directionOptions, value => { item.gaugeDirection = value; });
       if (shape === "circle") {
         addNumberInput("開始角度(度)", item.gaugeStartAngle ?? 0, value => { item.gaugeStartAngle = value; }, -3600);
-        addInfo("円ゲージの開始角度です。0度は右方向、90度は下方向、180度は左方向、270度は上方向です。");
+        addInfo("円ゲージの開始角度です。0度は上方向、90度は右方向、180度は下方向、270度は左方向です。");
       }
 
       addPropertyDivider("値");

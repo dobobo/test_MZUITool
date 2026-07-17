@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.37 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.38 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -44,6 +44,7 @@
  * v0.4.35では、パーツ移動開始時にフォーカス中パーツのドラッグを優先し、クリック確定をマウスボタン解放時へ変更しています。
  * v0.4.36では、円ゲージの開始角度基準を0度=右方向へ統一し、円ゲージ画像の不要な円形クリップを解消しています。
  * v0.4.37では、プレビューの右クリック対象決定でフォーカス中パーツを優先し、手前パーツへの誤吸着を抑制しています。
+ * v0.4.38では、円ゲージ開始角度の実機基準をツール表示と一致する基準へ再調整しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -4174,7 +4175,7 @@
         const cx = x + width / 2;
         const cy = y + height / 2;
         const radius = Math.max(width, height) * 2;
-        const startRad = (toNumber(startAngleDeg, 0) * Math.PI) / 180;
+        const startRad = ((toNumber(startAngleDeg, 0) - 90) * Math.PI) / 180;
         const sweep = Math.PI * 2 * rate * (direction === "counterClockwise" ? -1 : 1);
         ctx.save();
         ctx.beginPath();
@@ -4263,7 +4264,7 @@
       const cy = y + height / 2;
       const radius = Math.max(1, Math.min(width, height) / 2);
       const inner = radius * 0.58;
-      const start = (toNumber(startAngleDeg, 0) * Math.PI) / 180;
+      const start = ((toNumber(startAngleDeg, 0) - 90) * Math.PI) / 180;
       const end = start + (direction === "counterClockwise" ? -1 : 1) * Math.PI * 2 * clamp(rate, 0, 1);
       ctx.save();
       ctx.beginPath();
