@@ -5,9 +5,10 @@
 RPGツクールMZ 用の翻訳文章差し替えアプリです。
 
 - 元データ: `gui_jsonTEST.zip`
-- 修正済み一括ダウンロード: [`gui_jsonTEST_fixed.zip`](gui_jsonTEST_fixed.zip)
+- **修正済み一括ダウンロード（exe 同梱）**: [`gui_jsonTEST_fixed.zip`](gui_jsonTEST_fixed.zip)
 - 修正済みソース: [`gui_jsonTEST/`](gui_jsonTEST/)
-- 特殊文字（`\` / 円マーク / `[]`）認識の修正内容: [`gui_jsonTEST/README.md`](gui_jsonTEST/README.md)
+  - `gui_json.exe` … 64bit Windows
+  - `gui_json_x86.exe` … 32bit Windows
 
 ```bash
 cd gui_jsonTEST
