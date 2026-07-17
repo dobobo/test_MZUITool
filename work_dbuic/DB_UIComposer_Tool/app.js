@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.45";
+  const TOOL_VERSION = "0.4.46";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -1023,6 +1023,108 @@
     if (!preset) return null;
     const virtualItem = Object.assign({}, item, { type: "compositeImage", layers: cloneForHistory(preset.layers || item.layers || []) });
     return compositePresetBakedImageForItem(virtualItem, lib, preset);
+  }
+
+  function resolveCompositePresetForItem(item) {
+    if (!item || item.type !== "compositeImage") return null;
+    const psdKey = String(item.compositePresetPsdKey || "");
+    const presetId = String(item.selectedPresetId || item.compositePresetNameId || "");
+    if (!psdKey || !presetId) return null;
+    const libRaw = compositePresetLibraryByKey(psdKey);
+    if (!libRaw) return null;
+    const lib = normalizeCompositePresetLibrary(libRaw);
+    const preset = (lib.presets || []).find(entry => entry.id === presetId);
+    if (!preset) return null;
+    return { psdKey, presetId, lib, preset };
+  }
+
+  async function ensureCompositeRuntimePngExports(options = {}) {
+    const reason = String(options.reason || "runtimeExport");
+    const targets = [];
+    for (const win of state.windows || []) {
+      for (const item of win.items || []) {
+        if (item?.type === "compositeImage") targets.push({ win, item });
+      }
+    }
+    if (targets.length <= 0) return true;
+
+    if (!projectAssets.loaded || !projectAssets.directoryHandle) {
+      debugLog("warn", "複合画像の自動書き出しに必要なプロジェクト情報が未読込です。", { reason, compositeCount: targets.length });
+      showToast("複合画像の自動書き出しには、先に『ツクールプロジェクト読込』が必要です");
+      return false;
+    }
+    const writeOk = await ensureDirectoryWritePermission(projectAssets.directoryHandle);
+    if (!writeOk) {
+      debugLog("warn", "複合画像の自動書き出しに必要な書込権限がありません。", { reason });
+      showToast("複合画像の自動書き出しに必要な書込権限がありません");
+      return false;
+    }
+
+    await refreshProjectAssetsQuietly();
+    const exportJobs = new Map();
+    let unresolved = 0;
+    for (const target of targets) {
+      const resolved = resolveCompositePresetForItem(target.item);
+      if (!resolved) continue;
+      const expected = compositePresetBakedImageForItem(target.item, resolved.lib, resolved.preset);
+      const expectedExists = !!(expected?.fileName && findProjectImage({ folder: expected.folder, fileName: expected.fileName }));
+      const exported = resolved.preset?.exportedImage || {};
+      if (!expectedExists || !exported.fileName) {
+        const key = `${resolved.psdKey}\n${resolved.presetId}`;
+        if (!exportJobs.has(key)) exportJobs.set(key, { target, resolved, expected });
+      }
+      if (!expected?.fileName) unresolved += 1;
+    }
+
+    if (unresolved > 0) {
+      debugLog("warn", "複合画像の書き出し先ファイル名を解決できない項目があります。", { reason, unresolved });
+    }
+
+    let exportedCount = 0;
+    let failedCount = 0;
+    for (const job of exportJobs.values()) {
+      try {
+        const baked = await exportCompositePresetPng(job.target.item, job.resolved.preset);
+        if (baked?.fileName) {
+          exportedCount += 1;
+        } else {
+          failedCount += 1;
+          debugLog("error", "複合画像の自動書き出しに失敗しました。", {
+            reason,
+            psdKey: job.resolved.psdKey,
+            presetId: job.resolved.presetId
+          });
+        }
+      } catch (error) {
+        failedCount += 1;
+        debugLog("error", "複合画像の自動書き出しで例外が発生しました。", {
+          reason,
+          psdKey: job.resolved.psdKey,
+          presetId: job.resolved.presetId,
+          message: error?.message || String(error)
+        });
+      }
+    }
+
+    if (exportedCount > 0) await refreshProjectAssetsQuietly();
+    let synced = false;
+    for (const target of targets) {
+      const resolved = resolveCompositePresetForItem(target.item);
+      if (!resolved) continue;
+      const before = JSON.stringify(target.item.bakedImage || null);
+      applyCompositePresetBakedImage(target.item, resolved.lib, resolved.preset);
+      const after = JSON.stringify(target.item.bakedImage || null);
+      if (before !== after) synced = true;
+    }
+    if (synced) render();
+    debugLog("info", "複合画像の自動書き出し確認を完了しました。", {
+      reason,
+      compositeCount: targets.length,
+      exportJobCount: exportJobs.size,
+      exportedCount,
+      failedCount
+    });
+    return failedCount <= 0;
   }
 
   function deleteCompositePresetLibraryByKey(psdKey) {
@@ -12167,6 +12269,15 @@ ${choiceRuleStructComment()}
     }
   }
 
+  async function copyMZScriptWithAutoCompositeExport() {
+    const ok = await ensureCompositeRuntimePngExports({ reason: "copyMZScript" });
+    if (!ok) {
+      showToast("複合画像の自動書き出しに失敗したため、MZスクリプトのコピーを中止しました");
+      return;
+    }
+    await copyText(buildMZScriptText());
+  }
+
   function downloadJson() {
     const blob = new Blob([buildLayoutJsonText()], { type: "application/json" });
     const a = document.createElement("a");
@@ -14289,7 +14400,7 @@ ${e?.message || String(e)}`);
         return;
       }
       case "copyMZScript":
-        void copyText(buildMZScriptText());
+        void copyMZScriptWithAutoCompositeExport();
         return;
       default:
         return;
@@ -14487,7 +14598,7 @@ ${e?.message || String(e)}`);
     $("undoBtn")?.addEventListener("click", undoLastMutation);
     $("redoBtn")?.addEventListener("click", redoLastMutation);
     $("duplicateBtn")?.addEventListener("click", duplicateSelectedObject);
-    $("copyScriptBtn").addEventListener("click", () => copyText(buildMZScriptText()));
+    $("copyScriptBtn").addEventListener("click", () => { void copyMZScriptWithAutoCompositeExport(); });
     $("openCompositePresetManagerTopBtn")?.addEventListener("click", () => { openCompositePresetManager(); });
     $("copyRuntimeCommandBtn")?.addEventListener("click", () => {
       const commandList = buildRuntimeEventCommandList();
