@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.32";
+  const TOOL_VERSION = "0.4.33";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -7718,6 +7718,47 @@ ${choiceRuleStructComment()}
     const row = document.createElement("div");
     row.className = "property-top-switches";
     for (const item of items) {
+      if (item.kind === "visibility") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "property-top-icon-toggle property-top-icon-visible";
+        button.title = item.help || (item.value ? "クリックで非表示" : "クリックで表示");
+        button.setAttribute("aria-label", button.title);
+        setHoverHelp(button, item.label || "表示", item.help || "");
+        const img = document.createElement("img");
+        img.src = item.value ? "assets/ake.png" : "assets/toji.png";
+        img.alt = item.value ? "表示" : "非表示";
+        img.draggable = false;
+        const text = document.createElement("span");
+        text.textContent = item.label || "表示";
+        button.appendChild(img);
+        button.appendChild(text);
+        button.addEventListener("click", () => {
+          runStateMutation(`${item.label}変更`, () => item.onChange(!item.value));
+        });
+        row.appendChild(button);
+        continue;
+      }
+      if (item.kind === "lock") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "property-top-icon-toggle property-top-icon-lock";
+        button.title = item.help || (item.value ? "クリックで位置ロック解除" : "クリックで位置ロック");
+        button.setAttribute("aria-label", button.title);
+        setHoverHelp(button, item.label || "位置ロック", item.help || "");
+        const icon = document.createElement("span");
+        icon.className = "property-top-lock-glyph";
+        icon.textContent = item.value ? "🔒" : "🔓";
+        const text = document.createElement("span");
+        text.textContent = item.label || "位置ロック";
+        button.appendChild(icon);
+        button.appendChild(text);
+        button.addEventListener("click", () => {
+          runStateMutation(`${item.label}変更`, () => item.onChange(!item.value));
+        });
+        row.appendChild(button);
+        continue;
+      }
       const label = document.createElement("label");
       label.className = "property-top-switch";
       setHoverHelp(label, item.label, item.help || "");
@@ -7747,6 +7788,30 @@ ${choiceRuleStructComment()}
       setHoverHelp(button, info.text, info.help || "");
       button.addEventListener("click", info.onClick);
       row.appendChild(button);
+    }
+    props.appendChild(row);
+  }
+
+  function addTopIdentityInputs(entries) {
+    const row = document.createElement("div");
+    row.className = "property-top-identity";
+    for (const entry of entries) {
+      const label = document.createElement("label");
+      label.className = "property-top-identity-field";
+      setHoverHelp(label, entry.label, entry.help || "");
+      const title = document.createElement("span");
+      title.className = "property-top-identity-label";
+      title.textContent = entry.label;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = String(entry.value ?? "");
+      input.placeholder = entry.placeholder || "";
+      input.addEventListener("change", () => {
+        runPropertyValueMutation(`${entry.label}変更`, () => entry.onChange(input.value));
+      });
+      label.appendChild(title);
+      label.appendChild(input);
+      row.appendChild(label);
     }
     props.appendChild(row);
   }
@@ -7800,8 +7865,8 @@ ${choiceRuleStructComment()}
     const bounds = groupBounds(group.id);
     addPropertyHeader("グループ", `${group.name || group.id} / ${group.id} / ${bounds.count}件`);
     addTopSwitches([
-      { label: "表示する", value: group.visible !== false, onChange: value => { group.visible = value; }, help: "このグループ内のウィンドウをまとめて表示/非表示します。" },
-      { label: "位置ロック", value: group.locked === true, onChange: value => { group.locked = value; }, help: "ONにすると、このグループ内のウィンドウ/パーツ移動を禁止します。" }
+      { label: "表示", kind: "visibility", value: group.visible !== false, onChange: value => { group.visible = value; }, help: "このグループ内のウィンドウをまとめて表示/非表示します。" },
+      { label: "位置ロック", kind: "lock", value: group.locked === true, onChange: value => { group.locked = value; }, help: "ONにすると、このグループ内のウィンドウ/パーツ移動を禁止します。" }
     ]);
     addPropertyButtonRow([
       { text: "グループ複製", onClick: () => duplicateGroup(group.id), help: "グループ内のウィンドウもまとめて複製します。" },
@@ -7831,8 +7896,8 @@ ${choiceRuleStructComment()}
 
     addPropertyHeader("ウィンドウ", `${win.id || "(idなし)"}${win.groupId ? " / " + groupName(win.groupId) : ""} / ${Math.round(win.x || 0)}, ${Math.round(win.y || 0)} / ${Math.round(win.width || 0)}×${Math.round(win.height || 0)}`);
     addTopSwitches([
-      { label: "表示する", value: win.visible !== false, onChange: value => { win.visible = value; }, help: "このウィンドウ全体の表示/非表示です。" },
-      { label: "位置ロック", value: win.locked === true, onChange: value => { win.locked = value; }, help: "ONにすると、このウィンドウ本体の移動/リサイズを禁止します。" },
+      { label: "表示", kind: "visibility", value: win.visible !== false, onChange: value => { win.visible = value; }, help: "このウィンドウ全体の表示/非表示です。" },
+      { label: "位置ロック", kind: "lock", value: win.locked === true, onChange: value => { win.locked = value; }, help: "ONにすると、このウィンドウ本体の移動/リサイズを禁止します。" },
       { label: "入力有効", value: win.inputEnabled !== false, onChange: value => { win.inputEnabled = value; }, help: "OFFにすると、このウィンドウ内のボタンや選択肢クリックを無効化します。" },
       { label: "スクロール", value: win.scrollEnabled === true, onChange: value => { win.scrollEnabled = value; }, help: "ONにすると、ウィンドウ内コンテンツをマウスホイールで縦スクロールできます。" }
     ]);
@@ -7936,8 +8001,8 @@ ${choiceRuleStructComment()}
 
     addPropertyHeader(itemTypeLabel(item), `${win.id || "(window)"} > ${itemDisplayName(item) || item.id || "(idなし)"}`);
     addTopSwitches([
-      { label: "表示する", value: item.visible !== false, onChange: value => { item.visible = value; }, help: "このパーツの表示/非表示です。" },
-      { label: "位置ロック", value: item.locked === true, onChange: value => { item.locked = value; }, help: "ONにすると、このパーツの移動/リサイズを禁止します。" },
+      { label: "表示", kind: "visibility", value: item.visible !== false, onChange: value => { item.visible = value; }, help: "このパーツの表示/非表示です。" },
+      { label: "位置ロック", kind: "lock", value: item.locked === true, onChange: value => { item.locked = value; }, help: "ONにすると、このパーツの移動/リサイズを禁止します。" },
       { label: "外にも表示", value: item.allowOutsideWindow === true, onChange: value => { item.allowOutsideWindow = value; }, help: "ONにするとウィンドウ本体からはみ出した部分も表示します。" }
     ]);
     addPropertyButtonRow([
@@ -7945,16 +8010,26 @@ ${choiceRuleStructComment()}
       { text: "削除", className: "danger", onClick: () => deleteSelectedObject(), help: "選択中のパーツを削除します。Ctrl+Zで戻せます。" }
     ]);
 
+    addTopIdentityInputs([
+      {
+        label: "表示名",
+        value: itemDisplayName(item),
+        onChange: value => {
+          item.displayName = safeItemDisplayNameForWindow(win, value, item.id || "要素", item);
+        }
+      },
+      {
+        label: "要素ID",
+        value: item.id,
+        onChange: value => {
+          const old = item.id;
+          item.id = safeItemIdForWindow(win, value, old, item);
+          if (selected?.itemId === old) selected.itemId = item.id;
+        }
+      }
+    ]);
+
     addPropertyDivider("基本");
-    addTextInput("表示名", itemDisplayName(item), value => {
-      item.displayName = safeItemDisplayNameForWindow(win, value, item.id || "要素", item);
-    });
-    addTextInput("要素ID", item.id, value => {
-      const old = item.id;
-      item.id = safeItemIdForWindow(win, value, old, item);
-      if (selected?.itemId === old) selected.itemId = item.id;
-    });
-    addTypeHint(itemTypeLabel(item));
     addInfo("前後順は一覧の上下順で決まります。上にあるほど手前に表示されます。");
 
     addPropertyDivider("配置・サイズ");
@@ -7980,8 +8055,6 @@ ${choiceRuleStructComment()}
       addCheckbox("太字", item.bold === true, value => { item.bold = value; });
       addCheckbox("斜体", item.italic === true, value => { item.italic = value; });
     } else if (item.type === "log") {
-      addPropertyDivider("ログ表示");
-      addInfo("プラグインコマンドで1行ずつ追加するログパーツです。ウィンドウ付属ログではなく、文字カテゴリの独立パーツとして使えます。");
       addNumberPair("幅", item.width || 320, "高さ", item.height || 120, (a, b) => { item.width = Math.max(1, a); item.height = Math.max(1, b); });
       addTextarea("プレビュー用ログ", item.sampleText || "ログを追加しました。", value => { item.sampleText = value; });
       addNumberInput("最大保持行数", item.maxLines || 8, value => { item.maxLines = Math.max(1, value); }, 1);
@@ -8005,7 +8078,9 @@ ${choiceRuleStructComment()}
         applyOwnerSizePercent(item, a, b);
       });
       addButtonControl("原寸に戻す", () => {
-        applyOwnerSizePercent(item, 100, 100);
+        runStateMutation("原寸に戻す", () => {
+          applyOwnerSizePercent(item, 100, 100);
+        });
       });
       addSelect("ゲージ種類", item.gaugeShape || item.gaugeType || "horizontal", [
         { value: "horizontal", label: "横ゲージ" },
@@ -8212,7 +8287,9 @@ ${choiceRuleStructComment()}
         applyOwnerSizePercent(item, a, b);
       });
       addButtonControl("原寸に戻す", () => {
-        applyOwnerSizePercent(item, 100, 100);
+        runStateMutation("原寸に戻す", () => {
+          applyOwnerSizePercent(item, 100, 100);
+        });
       });
 
       addPropertyDivider("ボタン種類");
@@ -8281,12 +8358,14 @@ ${choiceRuleStructComment()}
       addPropertyDivider("統合画像の拡大率・不透明度");
       addNumberPair("X拡大率（%）", imageScalePercent(item, "scaleX"), "Y拡大率（%）", imageScalePercent(item, "scaleY"), (a, b) => { setImageScalePercent(item, "scaleX", a); setImageScalePercent(item, "scaleY", b); });
       addButtonControl("原寸に戻す", () => {
-        const naturalW = Math.max(1, Number(bounds.width || item.width || 1));
-        const naturalH = Math.max(1, Number(bounds.height || item.height || 1));
-        item.width = naturalW;
-        item.height = naturalH;
-        setImageScalePercent(item, "scaleX", 100);
-        setImageScalePercent(item, "scaleY", 100);
+        runStateMutation("原寸に戻す", () => {
+          const naturalW = Math.max(1, Number(bounds.width || item.width || 1));
+          const naturalH = Math.max(1, Number(bounds.height || item.height || 1));
+          item.width = naturalW;
+          item.height = naturalH;
+          setImageScalePercent(item, "scaleX", 100);
+          setImageScalePercent(item, "scaleY", 100);
+        });
       });
       addNumberInput("不透明度", item.opacity ?? 255, value => { item.opacity = clamp(value, 0, 255); }, 0, 255);
 
@@ -8328,10 +8407,12 @@ ${choiceRuleStructComment()}
       addPropertyDivider("画像の拡大率・不透明度");
       addNumberPair("X拡大率（%）", imageScalePercent(item, "scaleX"), "Y拡大率（%）", imageScalePercent(item, "scaleY"), (a, b) => { setImageScalePercent(item, "scaleX", a); setImageScalePercent(item, "scaleY", b); });
       addButtonControl("原寸に戻す", () => {
-        item.width = Math.max(1, Number(item.previewNaturalWidth || item.width || 1));
-        item.height = Math.max(1, Number(item.previewNaturalHeight || item.height || 1));
-        setImageScalePercent(item, "scaleX", 100);
-        setImageScalePercent(item, "scaleY", 100);
+        runStateMutation("原寸に戻す", () => {
+          item.width = Math.max(1, Number(item.previewNaturalWidth || item.width || 1));
+          item.height = Math.max(1, Number(item.previewNaturalHeight || item.height || 1));
+          setImageScalePercent(item, "scaleX", 100);
+          setImageScalePercent(item, "scaleY", 100);
+        });
       });
       addNumberInput("不透明度", item.opacity ?? 255, value => { item.opacity = clamp(value, 0, 255); }, 0, 255);
     }
