@@ -28,6 +28,10 @@ cd gui_jsonTEST
 go test ./internal/replace -v
 ```
 
+## 一括ダウンロード
+
+修正済み一式はリポジトリ直下の `gui_jsonTEST_fixed.zip` にまとめています。
+
 ## Windows でのビルド
 
 ```bash
