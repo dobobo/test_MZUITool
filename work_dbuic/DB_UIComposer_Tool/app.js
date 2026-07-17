@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.34";
+  const TOOL_VERSION = "0.4.35";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -74,6 +74,7 @@
   let objectClipboard = null;
   let previewInlineEditClickCycle = null;
   let previewInlineTextEditorState = null;
+  let pendingPreviewClick = null;
 
   function isObjectListControlTarget(target) {
     return !!target?.closest?.("button,input,select,textarea,.object-row-control-strip,.object-row-actions,.object-row-mini-button");
@@ -2917,10 +2918,27 @@
         beginPreviewInlineTextEdit(win, item, el);
         return;
       }
-      selectItem(win.id, item.id);
-      const reason = positionLockReason(win, item);
+      pendingPreviewClick = { kind: "item", windowId: win.id, itemId: item.id, pointerId: ev.pointerId };
+
+      let dragWindowId = win.id;
+      let dragItemId = item.id;
+      // クリック位置に現在フォーカス中パーツが重なっている場合は、
+      // 最前面要素よりもフォーカス中パーツのドラッグを優先します。
+      if (selected?.kind === "item" && !globalPartPositionLocked) {
+        const selectedKey = `item:${selected.windowId || ""}/${selected.itemId || ""}`;
+        const hits = hitInsideCandidatesAtPoint(ev.clientX, ev.clientY);
+        const selectedHit = hits.find(candidate => candidateKey(candidate) === selectedKey);
+        if (selectedHit?.kind === "item") {
+          dragWindowId = selectedHit.windowId;
+          dragItemId = selectedHit.itemId;
+        }
+      }
+      const dragWin = state.windows.find(w => w.id === dragWindowId);
+      const dragItem = dragWin?.items?.find(i => i.id === dragItemId);
+      if (!dragWin || !dragItem) return;
+      const reason = positionLockReason(dragWin, dragItem);
       if (reason) { showToast(reason); return; }
-      drag = { type: "moveItem", windowId: win.id, itemId: item.id, startX: ev.clientX, startY: ev.clientY, baseX: item.x || 0, baseY: item.y || 0, started: false, historySnapshot: createHistorySnapshot(), historyLabel: "パーツ移動" };
+      drag = { type: "moveItem", windowId: dragWindowId, itemId: dragItemId, startX: ev.clientX, startY: ev.clientY, baseX: dragItem.x || 0, baseY: dragItem.y || 0, started: false, historySnapshot: createHistorySnapshot(), historyLabel: "パーツ移動" };
       safeSetPointerCapture(el, ev.pointerId);
     });
     return el;
@@ -11944,6 +11962,7 @@ ${choiceRuleStructComment()}
   function onPointerMove(ev) {
     if (!drag) return;
     if (!isDragStarted(ev, drag)) return;
+    pendingPreviewClick = null;
     const zoomRate = previewZoomRate();
     const dx = (ev.clientX - drag.startX) / zoomRate;
     const dy = (ev.clientY - drag.startY) / zoomRate;
@@ -12017,9 +12036,18 @@ ${choiceRuleStructComment()}
     render();
   }
 
-  function onPointerUp() {
-    if (drag?.historySnapshot && drag.started) commitHistorySnapshot(drag.historySnapshot, drag.historyLabel || "ドラッグ編集");
+  function onPointerUp(ev) {
+    const wasDragged = !!drag?.started;
+    if (drag?.historySnapshot && wasDragged) commitHistorySnapshot(drag.historySnapshot, drag.historyLabel || "ドラッグ編集");
     drag = null;
+    if (!wasDragged && pendingPreviewClick) {
+      if (pendingPreviewClick.kind === "item") {
+        selectItem(pendingPreviewClick.windowId, pendingPreviewClick.itemId);
+      } else if (pendingPreviewClick.kind === "window") {
+        selectWindow(pendingPreviewClick.windowId);
+      }
+    }
+    pendingPreviewClick = null;
   }
 
   async function copyText(text) {
