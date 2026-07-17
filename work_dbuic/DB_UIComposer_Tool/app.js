@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.36";
+  const TOOL_VERSION = "0.4.37";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -13923,9 +13923,17 @@ ${e?.message || String(e)}`);
     const point = pointerToPreviewPoint(ev.clientX, ev.clientY);
     if (point.x >= 0 && point.y >= 0 && point.x <= state.screenWidth && point.y <= state.screenHeight) {
       const insideHits = hitInsideCandidatesAtPoint(ev.clientX, ev.clientY);
-      if (insideHits.length) return insideHits[0];
+      if (insideHits.length) {
+        const selectedKey = selectedCandidateKey();
+        const selectedHit = selectedKey ? insideHits.find(candidate => candidateKey(candidate) === selectedKey) : null;
+        return selectedHit || insideHits[0];
+      }
       const windowHits = hitWindowsAtPoint(ev.clientX, ev.clientY);
-      if (windowHits.length) return windowHits[0];
+      if (windowHits.length) {
+        const selectedKey = selectedCandidateKey();
+        const selectedHit = selectedKey ? windowHits.find(candidate => candidateKey(candidate) === selectedKey) : null;
+        return selectedHit || windowHits[0];
+      }
       return { kind: "background" };
     }
     return null;
