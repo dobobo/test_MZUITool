@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.42";
+  const TOOL_VERSION = "0.4.43";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -6277,13 +6277,19 @@
   function commandCatalogSafeText(value, fallback = "未設定") {
     const raw = value == null ? "" : String(value);
     const text = raw
-      .replace(/[\u0000-\u001f\u007f]+/g, " ")
+      .replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, " ")
       .replace(/[\r\n]+/g, " ")
       .replace(/\s+/g, " ")
       .replace(/\*\//g, "＊／")
       .replace(/\/\*/g, "／＊")
       .trim();
     return text || fallback;
+  }
+
+  function escapeEmbeddedJsonForScript(text) {
+    return String(text || "")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
   }
 
   function commandCatalogDefaultText(value) {
@@ -6542,7 +6548,7 @@
         compositePresetImageTable[`${lib.key}\n${preset.id}`] = { folder, fileName };
       }
     }
-    const compositePresetImageTableJson = JSON.stringify(compositePresetImageTable, null, 2);
+    const compositePresetImageTableJson = escapeEmbeddedJsonForScript(JSON.stringify(compositePresetImageTable, null, 2));
     const layoutId = commandCatalogSafeText(state.layoutId, "DefaultLayout");
     return `/*:
  * @target MZ
@@ -7741,6 +7747,8 @@ ${choiceRuleStructComment()}
   let currentPropertySectionBody = null;
   let currentPropertySectionIndex = 0;
   const propertySectionOpenState = new Map();
+  const propertyTargetObjectKeys = new WeakMap();
+  let propertyTargetObjectKeySerial = 1;
 
   function appendPropertyControl(element) {
     (currentPropertySectionBody || props).appendChild(element);
@@ -7752,9 +7760,25 @@ ${choiceRuleStructComment()}
 
   function currentPropertyTargetKey() {
     if (!selected) return "none";
-    if (selected.kind === "group") return `group:${selected.groupId || ""}`;
-    if (selected.kind === "window") return `window:${selected.windowId || ""}`;
-    return `item:${selected.windowId || ""}:${selected.itemId || ""}`;
+    const stableObjectKey = (prefix, obj, fallback) => {
+      if (!obj || (typeof obj !== "object" && typeof obj !== "function")) return `${prefix}:${fallback}`;
+      let key = propertyTargetObjectKeys.get(obj);
+      if (!key) {
+        key = `${prefix}@${propertyTargetObjectKeySerial++}`;
+        propertyTargetObjectKeys.set(obj, key);
+      }
+      return key;
+    };
+    if (selected.kind === "group") {
+      const group = selectedGroup();
+      return stableObjectKey("group", group, selected.groupId || "");
+    }
+    if (selected.kind === "window") {
+      const win = selectedWindow();
+      return stableObjectKey("window", win, selected.windowId || "");
+    }
+    const item = selectedItem();
+    return stableObjectKey("item", item, `${selected.windowId || ""}:${selected.itemId || ""}`);
   }
 
   function propertySectionKey(title) {
