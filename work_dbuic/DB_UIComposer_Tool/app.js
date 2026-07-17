@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.39";
+  const TOOL_VERSION = "0.4.40";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -10334,6 +10334,12 @@ ${choiceRuleStructComment()}
   }
 
   function openCompositePresetInsertPicker(targetItem = null) {
+    const initialChoices = compositePresetInsertChoices();
+    if (!initialChoices.length) {
+      showToast("登録済みのPSD/名前IDがありません。統合画像プリセット管理を開きます。");
+      void openCompositePresetManager(targetItem);
+      return;
+    }
     if (compositePresetInsertWindow && !compositePresetInsertWindow.closed) {
       if (targetItem === compositePresetInsertTargetItem) {
         focusCompositePresetInsertWindow();
@@ -13808,8 +13814,7 @@ ${e?.message || String(e)}`);
             icon: "🗂",
             description: "複数画像を1つに合成して扱うパーツです。ゲーム内では一枚絵として表示できます。",
             action: () => {
-              const item = addItem("compositeImage");
-              setTimeout(() => openProjectImagePicker(ensureCompositeImageLayers(item)[0]), 0);
+              openCompositePresetInsertPicker();
             }
           }
         ]
