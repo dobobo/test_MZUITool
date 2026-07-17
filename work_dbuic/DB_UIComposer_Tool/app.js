@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.30";
+  const TOOL_VERSION = "0.4.31";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -7899,17 +7899,6 @@ ${choiceRuleStructComment()}
     addTextInput("文字色", win.textColor || "", value => { win.textColor = value; }, "例: #ffffff / 空欄で継承");
     addTextInput("縁取り色", win.outlineColor || "", value => { win.outlineColor = value; }, "例: rgba(0,0,0,0.85) / 空欄で継承");
     addNumberInput("縁取り幅", win.outlineWidth ?? 0, value => { win.outlineWidth = Math.max(0, value); }, 0);
-
-    addPropertyDivider("ログ");
-    win.log = normalizeWindowLogDraft(win.log);
-    addCheckbox("ログ表示を有効", win.log.enabled === true, value => { win.log.enabled = value; });
-    addNumberInput("ログ最大行数", win.log.maxLines || 200, value => { win.log.maxLines = Math.max(1, value); }, 1);
-    addNumberInput("ログ文字サイズ（0で継承）", win.log.fontSize || 0, value => { win.log.fontSize = Math.max(0, value); }, 0);
-    addNumberInput("ログ行高さ（0で継承）", win.log.lineHeight || 0, value => { win.log.lineHeight = Math.max(0, value); }, 0);
-    addNumberPair("ログ左右余白", win.log.paddingX || 0, "ログ上下余白", win.log.paddingY || 0, (a, b) => { win.log.paddingX = Math.max(0, a); win.log.paddingY = Math.max(0, b); });
-    addTextInput("ログ文字色", win.log.textColor || "", value => { win.log.textColor = value; }, "空欄でウィンドウ設定を使用");
-    addTextInput("ログ縁取り色", win.log.outlineColor || "", value => { win.log.outlineColor = value; }, "空欄でウィンドウ設定を使用");
-    addNumberInput("ログ縁取り幅（0で継承）", win.log.outlineWidth ?? 0, value => { win.log.outlineWidth = Math.max(0, value); }, 0);
 
     const area = ensurePlacementArea(win);
     addPropertyDivider("ウィンドウ外描画範囲");
