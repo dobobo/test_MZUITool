@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.40";
+  const TOOL_VERSION = "0.4.41";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -10364,7 +10364,8 @@ ${choiceRuleStructComment()}
       .list{border-right:1px solid #354157;overflow:auto;padding:12px}.preview{display:grid;grid-template-rows:1fr auto;min-width:0;}
       .row{border:1px solid #354157;border-radius:8px;padding:10px;margin-bottom:8px;background:#1b2333;cursor:pointer}.row:hover{border-color:#6384bd}.row.selected{background:#263957;border-color:#74a7ff}.row .name{font-weight:700}.row .meta{font-size:12px;color:#aebbd1;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .previewBox{margin:12px;border:1px solid #354157;border-radius:10px;background-color:#171d2a;background-image:linear-gradient(45deg,rgba(255,255,255,.04) 25%,transparent 25%),linear-gradient(-45deg,rgba(255,255,255,.04) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,rgba(255,255,255,.04) 75%),linear-gradient(-45deg,transparent 75%,rgba(255,255,255,.04) 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0;display:flex;align-items:center;justify-content:center;overflow:auto;min-height:0}.previewBox img{max-width:100%;max-height:100%;object-fit:contain}.empty{color:#9fb0c8;text-align:center;padding:24px}.footer{border-top:1px solid #354157;padding:12px;display:flex;gap:8px;align-items:center}.status{flex:1;color:#b9c9e2;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}button{background:#27334b;color:#f4f7ff;border:1px solid #475776;border-radius:7px;padding:8px 12px;font-weight:700;cursor:pointer}button.primary{background:#2f5ea8;border-color:#4b7ed1}button:disabled{opacity:.45;cursor:not-allowed}
-    </style></head><body><div class="header"><div><h1>統合画像プリセット挿入</h1><div class="sub">登録済みPSDの名前IDを選んで、メインウィンドウへ挿入します。</div></div><button id="closeBtn">閉じる</button></div><div class="body"><div id="list" class="list"></div><div class="preview"><div id="previewBox" class="previewBox"><div class="empty">名前IDを選択してください</div></div><div class="footer"><div id="status" class="status"></div><button id="refreshBtn">更新</button><button id="insertBtn" class="primary">挿入</button></div></div></div></body></html>`);
+      .header-actions{display:flex;align-items:center;gap:8px}
+    </style></head><body><div class="header"><div><h1>統合画像プリセット挿入</h1><div class="sub">登録済みPSDの名前IDを選んで、メインウィンドウへ挿入します。</div></div><div class="header-actions"><button id="refreshBtn">更新</button><button id="insertBtn" class="primary">挿入</button><button id="closeBtn">閉じる</button></div></div><div class="body"><div id="list" class="list"></div><div class="preview"><div id="previewBox" class="previewBox"><div class="empty">名前IDを選択してください</div></div><div class="footer"><div id="status" class="status"></div></div></div></div></body></html>`);
     doc.close();
     const stateLocal = { choices: [], selectedIndex: 0, previewSeq: 0 };
     const listEl = () => doc.getElementById("list");
