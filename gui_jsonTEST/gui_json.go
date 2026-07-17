@@ -40,9 +40,7 @@ func main() {
 
 	mw := &MyMainWindow{}
 	mw.dir = appDir()
-
-	exportDir := readOptionalFile(filepath.Join(mw.dir, "export_dir.txt"))
-	importDir := readOptionalFile(filepath.Join(mw.dir, "import_dir.txt"))
+	mw.loadRememberedPaths()
 
 	MW := MainWindow{
 		AssignTo: &mw.MainWindow,
@@ -54,7 +52,7 @@ func main() {
 			GroupBox{
 				Layout: HBox{},
 				Children: []Widget{
-					LineEdit{AssignTo: &mw.transSearchBox},
+					LineEdit{AssignTo: &mw.transSearchBox, Text: mw.transPath},
 					PushButton{Text: "翻訳Excelファイル", OnClicked: mw.transPbClicked},
 				},
 			},
@@ -68,14 +66,14 @@ func main() {
 			GroupBox{
 				Layout: HBox{},
 				Children: []Widget{
-					LineEdit{AssignTo: &mw.sourceSearchBox, Text: string(importDir)},
+					LineEdit{AssignTo: &mw.sourceSearchBox, Text: mw.sourcePath},
 					PushButton{Text: "元データフォルダ", OnClicked: mw.sourcePbClicked},
 				},
 			},
 			GroupBox{
 				Layout: HBox{},
 				Children: []Widget{
-					LineEdit{AssignTo: &mw.destSearchBox, Text: string(exportDir)},
+					LineEdit{AssignTo: &mw.destSearchBox, Text: mw.destPath},
 					PushButton{Text: "保存先フォルダ", OnClicked: mw.dest_pbClicked},
 				},
 			},
@@ -86,6 +84,54 @@ func main() {
 		walk.MsgBox(nil, "起動エラー", err.Error(), walk.MsgBoxIconError)
 		os.Exit(1)
 	}
+}
+
+func (mw *MyMainWindow) loadRememberedPaths() {
+	mw.transPath = readPathFile(filepath.Join(mw.dir, "trans_file.txt"))
+	mw.sourcePath = readPathFile(filepath.Join(mw.dir, "import_dir.txt"))
+	mw.destPath = readPathFile(filepath.Join(mw.dir, "export_dir.txt"))
+}
+
+func (mw *MyMainWindow) rememberTransPath(path string) {
+	mw.transPath = cleanPath(path)
+	writePathFile(filepath.Join(mw.dir, "trans_file.txt"), mw.transPath)
+}
+
+func (mw *MyMainWindow) rememberSourcePath(path string) {
+	mw.sourcePath = cleanPath(path)
+	writePathFile(filepath.Join(mw.dir, "import_dir.txt"), mw.sourcePath)
+}
+
+func (mw *MyMainWindow) rememberDestPath(path string) {
+	mw.destPath = cleanPath(path)
+	writePathFile(filepath.Join(mw.dir, "export_dir.txt"), mw.destPath)
+}
+
+func (mw *MyMainWindow) currentTransPath() string {
+	if mw.transSearchBox != nil {
+		if p := cleanPath(mw.transSearchBox.Text()); p != "" {
+			return p
+		}
+	}
+	return mw.transPath
+}
+
+func (mw *MyMainWindow) currentSourcePath() string {
+	if mw.sourceSearchBox != nil {
+		if p := cleanPath(mw.sourceSearchBox.Text()); p != "" {
+			return p
+		}
+	}
+	return mw.sourcePath
+}
+
+func (mw *MyMainWindow) currentDestPath() string {
+	if mw.destSearchBox != nil {
+		if p := cleanPath(mw.destSearchBox.Text()); p != "" {
+			return p
+		}
+	}
+	return mw.destPath
 }
 
 // appDir は exe のあるフォルダを返します（ダブルクリック起動でも cwd に依存しない）。
@@ -101,17 +147,9 @@ func appDir() string {
 	return wd
 }
 
-func readOptionalFile(path string) []byte {
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	return b
-}
-
 func (mw *MyMainWindow) sourcePbClicked() {
 	dlg := new(walk.FileDialog)
-	dlg.FilePath = mw.sourcePath
+	dlg.FilePath = dialogStartPath(mw.currentSourcePath(), desktopDir())
 	dlg.Title = "翻訳する元データフォルダを選択してください"
 	dlg.Filter = "All files (*.*)|*.*"
 	if ok, err := dlg.ShowBrowseFolder(mw); err != nil {
@@ -120,13 +158,13 @@ func (mw *MyMainWindow) sourcePbClicked() {
 	} else if !ok {
 		return
 	}
-	mw.sourcePath = dlg.FilePath
-	mw.sourceSearchBox.SetText(fmt.Sprintf("%s\r\n", mw.sourcePath))
+	mw.rememberSourcePath(dlg.FilePath)
+	mw.sourceSearchBox.SetText(mw.sourcePath)
 }
 
 func (mw *MyMainWindow) dest_pbClicked() {
 	dlg := new(walk.FileDialog)
-	dlg.FilePath = mw.destPath
+	dlg.FilePath = dialogStartPath(mw.currentDestPath(), desktopDir())
 	dlg.Title = "翻訳したファイルを保存するフォルダ先を選択してください"
 	dlg.Filter = "All files (*.*)|*.*"
 	if ok, err := dlg.ShowBrowseFolder(mw); err != nil {
@@ -135,32 +173,33 @@ func (mw *MyMainWindow) dest_pbClicked() {
 	} else if !ok {
 		return
 	}
-	mw.destPath = dlg.FilePath
-	mw.destSearchBox.SetText(fmt.Sprintf("%s\r\n", mw.destPath))
+	mw.rememberDestPath(dlg.FilePath)
+	mw.destSearchBox.SetText(mw.destPath)
 }
 
 func (mw *MyMainWindow) transPbClicked() {
 	dlg := new(walk.FileDialog)
-	dlg.FilePath = mw.transPath
+	dlg.FilePath = dialogStartPath(mw.currentTransPath(), desktopDir())
 	dlg.Title = "翻訳Excelファイルを選択してください"
-	dlg.Filter = "All files (*.*)|*.*"
+	dlg.Filter = "Excel files (*.xlsx)|*.xlsx|All files (*.*)|*.*"
 	if ok, err := dlg.ShowOpen(mw); err != nil {
 		walk.MsgBox(mw, "エラー", "ファイルオープンエラー", walk.MsgBoxOK)
 		return
 	} else if !ok {
 		return
 	}
-	mw.transPath = dlg.FilePath
-	mw.transSearchBox.SetText(fmt.Sprintf("%s\r\n", mw.transPath))
+	mw.rememberTransPath(dlg.FilePath)
+	mw.transSearchBox.SetText(mw.transPath)
 }
 
 func (mw *MyMainWindow) execute() {
-	transSearchBoxText := strings.TrimRight(mw.transSearchBox.Text(), "\r\n")
-	sourceSearchBoxText := strings.TrimRight(mw.sourceSearchBox.Text(), "\r\n")
-	destSearchBoxText := strings.TrimRight(mw.destSearchBox.Text(), "\r\n")
+	transSearchBoxText := cleanPath(mw.transSearchBox.Text())
+	sourceSearchBoxText := cleanPath(mw.sourceSearchBox.Text())
+	destSearchBoxText := cleanPath(mw.destSearchBox.Text())
 
-	_ = ioutil.WriteFile(filepath.Join(mw.dir, "export_dir.txt"), []byte(destSearchBoxText+"\r\n"), 0666)
-	_ = ioutil.WriteFile(filepath.Join(mw.dir, "import_dir.txt"), []byte(sourceSearchBoxText+"\r\n"), 0666)
+	mw.rememberTransPath(transSearchBoxText)
+	mw.rememberSourcePath(sourceSearchBoxText)
+	mw.rememberDestPath(destSearchBoxText)
 
 	if !strings.Contains(transSearchBoxText, ".xlsx") {
 		walk.MsgBox(mw, "エラー", "翻訳ファイルはxlsx形式のものを選んでください", walk.MsgBoxOKCancel)
