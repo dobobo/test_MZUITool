@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.31 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.32 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -38,6 +38,7 @@
  * v0.4.29では、一覧仕様をPhotoshop式（上ほど手前）へ戻し、サンプルの並び順を同仕様に合わせて調整しています。
  * v0.4.30では、左メニューへシーン削除を追加し、削除時に所属グループ/ウィンドウ/パーツも一括削除する仕様にしています。
  * v0.4.31では、ウィンドウ選択時のログプロパティ表示を廃止し、ログ設定はログパーツ側へ統一しています。
+ * v0.4.32では、ログの縁取り幅が確実に反映されるよう、ログ描画時の文字スタイル適用順を修正しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -3704,6 +3705,13 @@
       return Math.max(0, (rows.length - visibleRows) * lineHeight);
     }
 
+    drawDbTextExWithCurrentStyle(text, x, y, width) {
+      if (!text) return 0;
+      const textState = this.createTextState(String(text), x, y, width);
+      this.processAllText(textState);
+      return textState.outputWidth;
+    }
+
     drawDbLog(logDefinition, metrics) {
       const logState = normalizeLogState(logDefinition);
       if (!logState.enabled) return;
@@ -3716,7 +3724,7 @@
       if (logState.fontSize > 0) this.contents.fontSize = logState.fontSize;
       if (logState.textColor) this.contents.textColor = logState.textColor;
       if (logState.outlineColor) this.contents.outlineColor = logState.outlineColor;
-      if (logState.outlineWidth > 0) this.contents.outlineWidth = logState.outlineWidth;
+      this.contents.outlineWidth = Math.max(0, toNumber(logState.outlineWidth, this.contents.outlineWidth));
       const lineHeight = this.dbLogLineHeight(logState);
       const rows = this.dbLogPreparedLines(logState, areaWidth);
       const x = Math.max(0, toNumber(logState.paddingX, 0));
@@ -3735,7 +3743,7 @@
       for (let i = 0; i < visible.length; i++) {
         const y = startY + i * lineHeight;
         if (y + lineHeight < 0 || y > areaHeight) continue;
-        this.drawTextEx(String(visible[i] ?? ""), x, y, textWidth);
+        this.drawDbTextExWithCurrentStyle(String(visible[i] ?? ""), x, y, textWidth);
       }
       this.contents = oldContents;
       oldContents.blt(tempBitmap, 0, 0, areaWidth, areaHeight, metrics.contentOffsetX, metrics.contentOffsetY);

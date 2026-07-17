@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.31";
+  const TOOL_VERSION = "0.4.32";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -2531,10 +2531,8 @@
       el.style.width = `${w}px`;
       el.style.height = `${h}px`;
       el.style.overflow = "hidden";
-      el.style.color = item.color || "white";
-      el.style.fontSize = `${Math.max(1, Number(item.fontSize || 20))}px`;
+      applyPreviewTextStyle(el, win, item, Number(item.fontSize || 20));
       el.style.lineHeight = `${lh}px`;
-      el.style.textShadow = "-1px -1px 0 rgba(0,0,0,.55),1px -1px 0 rgba(0,0,0,.55),-1px 1px 0 rgba(0,0,0,.55),1px 1px 0 rgba(0,0,0,.55)";
       const sample = String(item.sampleText || "ログを追加しました。").split(/\r?\n/).filter(Boolean);
       const lines = sample.length ? sample : ["ログを追加しました。"];
       const maxRows = Math.max(1, Math.floor((h - py * 2) / lh));
@@ -2550,6 +2548,8 @@
         row.style.whiteSpace = "nowrap";
         row.style.overflow = "hidden";
         row.style.textOverflow = "ellipsis";
+        applyPreviewTextStyle(row, win, item, Number(item.fontSize || 20));
+        row.style.lineHeight = `${lh}px`;
         el.appendChild(row);
       });
     } else if (item.type === "gauge") {
