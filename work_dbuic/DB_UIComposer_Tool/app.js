@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.43";
+  const TOOL_VERSION = "0.4.44";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -1378,6 +1378,13 @@
     if (element.isContentEditable) return true;
     const tag = element.tagName;
     return (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') && !element.disabled && !element.readOnly;
+  }
+
+  function shouldSuppressObjectListDrag(ev) {
+    const active = document.activeElement;
+    if (isTextEditingElement(active) || isTextEditingElement(ev?.target)) return true;
+    const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
+    return !!selection && selection.type === "Range" && String(selection.toString() || "").length > 0;
   }
 
   function supportsDirectoryPicker() {
@@ -5276,6 +5283,10 @@
       row.draggable = true;
       row.title = [row.title, "ドラッグして別グループへ移動できます"].filter(Boolean).join(" / ");
       row.addEventListener("dragstart", ev => {
+        if (shouldSuppressObjectListDrag(ev)) {
+          ev.preventDefault();
+          return;
+        }
         ev.stopPropagation();
         setObjectListSelectionDuringDrag({ kind: "window", windowId: win.id }, row);
         const payload = { kind: "window", windowId: win.id };
@@ -5342,7 +5353,6 @@
             return;
           }
           selected = { kind: "scene", sceneId: scene.id };
-          pendingObjectListReveal = true;
           render();
         });
         bindListContextMenu(row, { kind: "scene", sceneId: scene.id });
@@ -5400,7 +5410,7 @@
           if (consumeObjectListDoubleClick(ev, rowKey)) {
             if (beginObjectListRenameFromEvent(ev)) return;
           }
-          selectWindow(win.id);
+          selectWindow(win.id, { revealInList: false });
         });
         bindObjectListRowDrop(row, { kind: "window", windowId: win.id, groupId: normalizeGroupId(win.groupId || "") });
         bindListContextMenu(row, { kind: "window", windowId: win.id });
@@ -5450,10 +5460,14 @@
             if (consumeObjectListDoubleClick(ev, rowKey)) {
               if (beginObjectListRenameFromEvent(ev)) return;
             }
-            selectItem(win.id, item.id);
+            selectItem(win.id, item.id, { revealInList: false });
           });
           itemRow.draggable = true;
           itemRow.addEventListener("dragstart", ev => {
+            if (shouldSuppressObjectListDrag(ev)) {
+              ev.preventDefault();
+              return;
+            }
             ev.stopPropagation();
             setObjectListSelectionDuringDrag({ kind: "item", windowId: win.id, itemId: item.id }, itemRow);
             const payload = { kind: "item", windowId: win.id, itemId: item.id };
@@ -5563,10 +5577,14 @@
           toggleObjectListGroupCollapsed(group.id);
           return;
         }
-        selectGroup(group.id);
+        selectGroup(group.id, { revealInList: false });
       });
       row.draggable = true;
       row.addEventListener("dragstart", ev => {
+        if (shouldSuppressObjectListDrag(ev)) {
+          ev.preventDefault();
+          return;
+        }
         ev.stopPropagation();
         setObjectListSelectionDuringDrag({ kind: "group", groupId: group.id }, row);
         const payload = { kind: "group", groupId: group.id };
