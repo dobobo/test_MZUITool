@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.44 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.45 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -51,6 +51,7 @@
  * v0.4.42では、複合画像プリセット適用時に実機用の書き出しPNG参照を自動補完し、表示欠落を起こしにくくしています。
  * v0.4.43では、カタログJS生成時の特殊文字エスケープを強化し、名前変更後の折りたたみ状態が意図せず変わる問題を抑制しています。
  * v0.4.44では、一覧で文字編集中のドラッグ移動を抑止し、一覧クリック時の自動センタースクロールを停止しています。
+ * v0.4.45では、複合画像の書き出しPNG参照時に folder/fileName の参照元を一致させ、実機での画像未表示を抑制しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -2337,8 +2338,14 @@
           if (item.scaleYPercent === undefined) item.scaleYPercent = 100;
         } else if (item.type === "compositeImage") {
           const baked = item.bakedImage || {};
-          if (!item.folder && baked.folder) item.folder = String(baked.folder || "pictures");
-          if (!item.fileName && baked.fileName) item.fileName = String(baked.fileName || "").replace(/\.(png|jpg|jpeg|webp|gif|bmp)$/i, "");
+          // item.fileName が空で baked 側を使うケースでは、folder も baked 側へ揃えます。
+          // （folder だけ旧値のままだと、存在しないパスへ読みに行くことがあります）
+          if (!item.fileName && baked.fileName) {
+            item.fileName = String(baked.fileName || "").replace(/\.(png|jpg|jpeg|webp|gif|bmp)$/i, "");
+            item.folder = String(baked.folder || item.folder || "pictures");
+          } else if (!item.folder && baked.folder) {
+            item.folder = String(baked.folder || "pictures");
+          }
           item.width = Math.max(0, toNumber(item.width || baked.width, 0));
           item.height = Math.max(0, toNumber(item.height || baked.height, 0));
           if (item.scaleXPercent === undefined && item.scaleX !== undefined) item.scaleXPercent = Math.round(imageScaleRate(item, "scaleX") * 10000) / 100;
@@ -4064,11 +4071,14 @@
     drawDbCompositeImage(item) {
       // 複合画像は、MZ実行時は書き出し済みPNG（1枚絵）として扱います。
       const baked = item.bakedImage || {};
-      if (item.fileName || baked.fileName) {
+      const useItemImage = !!String(item.fileName || "").trim();
+      const resolvedFileName = String(useItemImage ? item.fileName : baked.fileName || "").trim();
+      const resolvedFolder = String(useItemImage ? item.folder : (baked.folder || item.folder) || "pictures").trim();
+      if (resolvedFileName) {
         const imageItem = Object.assign({}, item, {
           type: "image",
-          folder: item.folder || baked.folder || "pictures",
-          fileName: String(item.fileName || baked.fileName || "").replace(/\.(png|jpg|jpeg|webp|gif|bmp)$/i, ""),
+          folder: resolvedFolder || "pictures",
+          fileName: resolvedFileName.replace(/\.(png|jpg|jpeg|webp|gif|bmp)$/i, ""),
           width: Math.max(0, toNumber(item.width || baked.width, 0)),
           height: Math.max(0, toNumber(item.height || baked.height, 0))
         });
@@ -5735,7 +5745,7 @@
   });
 
   window.DB_UIComposer = {
-    version: "0.4.31",
+    version: "0.4.45",
     applyLayout,
     refreshScene,
     normalizeLayout,
