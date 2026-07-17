@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.35 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.36 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -42,6 +42,7 @@
  * v0.4.33では、プロパティUIの視認性を整理し、表示/ロック切替をアイコン化、表示名/要素IDの上部固定、原寸復帰の即時反映を行っています。
  * v0.4.34では、グループ/ウィンドウ/パーツの「基本」折りたたみを廃止し、名前系入力を折りたたみ外の上部へ統一配置しています。
  * v0.4.35では、パーツ移動開始時にフォーカス中パーツのドラッグを優先し、クリック確定をマウスボタン解放時へ変更しています。
+ * v0.4.36では、円ゲージの開始角度基準を0度=右方向へ統一し、円ゲージ画像の不要な円形クリップを解消しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -4171,8 +4172,8 @@
         if (!ctx || !canvas) return false;
         const cx = x + width / 2;
         const cy = y + height / 2;
-        const radius = Math.max(1, Math.min(width, height) / 2);
-        const startRad = ((toNumber(startAngleDeg, 0) - 90) * Math.PI) / 180;
+        const radius = Math.max(width, height) * 2;
+        const startRad = (toNumber(startAngleDeg, 0) * Math.PI) / 180;
         const sweep = Math.PI * 2 * rate * (direction === "counterClockwise" ? -1 : 1);
         ctx.save();
         ctx.beginPath();
@@ -4261,7 +4262,7 @@
       const cy = y + height / 2;
       const radius = Math.max(1, Math.min(width, height) / 2);
       const inner = radius * 0.58;
-      const start = ((toNumber(startAngleDeg, 0) - 90) * Math.PI) / 180;
+      const start = (toNumber(startAngleDeg, 0) * Math.PI) / 180;
       const end = start + (direction === "counterClockwise" ? -1 : 1) * Math.PI * 2 * clamp(rate, 0, 1);
       ctx.save();
       ctx.beginPath();

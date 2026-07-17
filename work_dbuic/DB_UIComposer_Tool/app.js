@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.35";
+  const TOOL_VERSION = "0.4.36";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -2563,7 +2563,7 @@
       const gaugeShape = String(item.gaugeShape || item.gaugeType || "horizontal");
       const gaugeDirection = String(item.gaugeDirection || (gaugeShape === "vertical" ? "bottomToTop" : "leftToRight"));
       const gaugeStartAngle = ((Number(item.gaugeStartAngle ?? 0) % 360) + 360) % 360;
-      const cssStartDeg = gaugeStartAngle - 90;
+      const cssStartDeg = gaugeStartAngle;
       el.dataset.gaugeShape = gaugeShape;
       el.dataset.gaugeDirection = gaugeDirection;
 
@@ -2580,7 +2580,6 @@
         if (gaugeShape === "circle") {
           holder.style.width = "100%";
           holder.style.height = "100%";
-          holder.style.borderRadius = "50%";
         }
         if (clipRate !== null) {
           const rate = clamp(Number(clipRate || 0), 0, 1);
