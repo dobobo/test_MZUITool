@@ -3359,3 +3359,67 @@ body.panel-resizing * {
   min-width: 34px !important;
   max-width: 34px !important;
 }
+
+
+.db-picker-dialog {
+  width: min(760px, calc(100vw - 48px));
+  height: min(680px, calc(100vh - 48px));
+}
+
+.db-picker-controls {
+  grid-template-columns: 1fr;
+}
+
+.db-picker-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.db-picker-row {
+  width: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 72px minmax(140px, 0.9fr) minmax(160px, 1.4fr);
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  padding: 10px 12px;
+  background: #171b25;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+}
+
+.db-picker-row:hover {
+  border-color: var(--accent);
+  background: #202737;
+}
+
+.db-picker-row.active {
+  border-color: var(--accent);
+  background: rgba(98, 169, 255, 0.16);
+}
+
+.db-picker-id {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.db-picker-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.db-picker-detail {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

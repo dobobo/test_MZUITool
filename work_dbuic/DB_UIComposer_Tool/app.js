@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.49";
+  const TOOL_VERSION = "0.4.50";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -1409,6 +1409,7 @@
       images: new Map(),
       psdFiles: new Map(),
       system: null,
+      database: createEmptyProjectDatabase(),
       windowSkinUrl: '',
       windowSkinImage: null,
       windowSkinReady: false,
@@ -1417,6 +1418,20 @@
       directoryHandle: null,
       directoryHandleStored: false,
       restoreStatus: ''
+    };
+  }
+
+  function createEmptyProjectDatabase() {
+    return {
+      actors: [],
+      classes: [],
+      skills: [],
+      items: [],
+      weapons: [],
+      armors: [],
+      enemies: [],
+      states: [],
+      loadedKeys: []
     };
   }
 
@@ -8630,6 +8645,224 @@ ${choiceRuleStructComment()}
     addNumberInput("装飾表示順", deco.zOrder ?? 100, value => { deco.zOrder = Number(value) || 0; });
   }
 
+  async function loadProjectDatabaseTables() {
+    projectAssets.database = createEmptyProjectDatabase();
+    const tableMap = {
+      actors: /(?:^|\/)data\/actors\.json$/i,
+      classes: /(?:^|\/)data\/classes\.json$/i,
+      skills: /(?:^|\/)data\/skills\.json$/i,
+      items: /(?:^|\/)data\/items\.json$/i,
+      weapons: /(?:^|\/)data\/weapons\.json$/i,
+      armors: /(?:^|\/)data\/armors\.json$/i,
+      enemies: /(?:^|\/)data\/enemies\.json$/i,
+      states: /(?:^|\/)data\/states\.json$/i
+    };
+    const loadedKeys = [];
+    for (const [key, pattern] of Object.entries(tableMap)) {
+      const entry = [...projectAssets.files.entries()].find(([p]) => pattern.test(p));
+      if (!entry) continue;
+      try {
+        const parsed = JSON.parse(await readTextFile(entry[1]));
+        projectAssets.database[key] = Array.isArray(parsed) ? parsed : [];
+        loadedKeys.push(key);
+      } catch (e) {
+        debugLog("error", `${key} の読込に失敗しました。`, { message: e.message, stack: e.stack });
+        projectAssets.database[key] = [];
+      }
+    }
+    projectAssets.database.loadedKeys = loadedKeys;
+    debugLog("info", "データベースJSONを読み込みました。", {
+      loadedKeys,
+      actorCount: Math.max(0, (projectAssets.database.actors || []).filter(Boolean).length),
+      itemCount: Math.max(0, (projectAssets.database.items || []).filter(Boolean).length)
+    });
+  }
+
+  function projectDatabaseTable(kind) {
+    const db = projectAssets.database || createEmptyProjectDatabase();
+    const map = {
+      actor: db.actors,
+      class: db.classes,
+      skill: db.skills,
+      item: db.items,
+      weapon: db.weapons,
+      armor: db.armors,
+      enemy: db.enemies,
+      state: db.states
+    };
+    return Array.isArray(map[kind]) ? map[kind] : [];
+  }
+
+  function projectSystemNamedList(kind) {
+    const sys = projectAssets.system || {};
+    if (kind === "variable") return Array.isArray(sys.variables) ? sys.variables : [];
+    if (kind === "switch") return Array.isArray(sys.switches) ? sys.switches : [];
+    if (kind === "elements") return Array.isArray(sys.elements) ? sys.elements : [];
+    if (kind === "weaponTypes") return Array.isArray(sys.weaponTypes) ? sys.weaponTypes : [];
+    if (kind === "armorTypes") return Array.isArray(sys.armorTypes) ? sys.armorTypes : [];
+    if (kind === "skillTypes") return Array.isArray(sys.skillTypes) ? sys.skillTypes : [];
+    if (kind === "equipTypes") return Array.isArray(sys.equipTypes) ? sys.equipTypes : [];
+    if (kind === "params") return Array.isArray(sys.terms?.params) ? sys.terms.params : [];
+    return [];
+  }
+
+  function databasePickerKindFromBinding(sourceType, objectType, typeCategory) {
+    const src = String(sourceType || "");
+    if (src === "actor") return "actor";
+    if (src === "enemy") return "enemy";
+    if (src === "state") return "state";
+    if (src === "variable") return "variable";
+    if (src === "type") return String(typeCategory || "weaponTypes");
+    if (src === "databaseObject") return String(objectType || "item");
+    return "";
+  }
+
+  function databasePickerTitle(kind) {
+    return ({
+      actor: "アクター一覧",
+      class: "職業一覧",
+      skill: "スキル一覧",
+      item: "アイテム一覧",
+      weapon: "武器一覧",
+      armor: "防具一覧",
+      enemy: "エネミー一覧",
+      state: "ステート一覧",
+      variable: "変数一覧",
+      switch: "スイッチ一覧",
+      elements: "属性一覧",
+      weaponTypes: "武器タイプ一覧",
+      armorTypes: "防具タイプ一覧",
+      skillTypes: "スキルタイプ一覧",
+      equipTypes: "装備タイプ一覧",
+      params: "能力値名一覧"
+    })[kind] || "データベース一覧";
+  }
+
+  function listDatabasePickerEntries(kind) {
+    const key = String(kind || "");
+    const namedKinds = new Set(["variable", "switch", "elements", "weaponTypes", "armorTypes", "skillTypes", "equipTypes", "params"]);
+    if (namedKinds.has(key)) {
+      const rows = projectSystemNamedList(key);
+      return rows.map((name, id) => {
+        if (id <= 0 && key !== "elements" && key !== "params") return null;
+        const label = String(name || "").trim();
+        if (!label && id === 0) return null;
+        return {
+          id,
+          name: label || `(未設定 ${id})`,
+          detail: key === "variable" ? `変数ID ${id}` : key === "switch" ? `スイッチID ${id}` : `index ${id}`
+        };
+      }).filter(Boolean);
+    }
+    const rows = projectDatabaseTable(key);
+    return rows.map((row, id) => {
+      if (!row || typeof row !== "object") return null;
+      const name = String(row.name || "").trim() || `(無題 ${id})`;
+      const detailParts = [];
+      if (row.nickname) detailParts.push(String(row.nickname));
+      if (row.description) detailParts.push(String(row.description).replace(/\r?\n/g, " "));
+      if (row.message1) detailParts.push(String(row.message1));
+      if (Array.isArray(row.params)) detailParts.push(`params:${row.params.slice(0, 4).join("/")}`);
+      return {
+        id,
+        name,
+        detail: detailParts.filter(Boolean).join(" / ").slice(0, 120)
+      };
+    }).filter(Boolean);
+  }
+
+  function findDatabasePickerEntry(kind, id) {
+    const n = Math.max(0, Number(id || 0));
+    return listDatabasePickerEntries(kind).find(entry => Number(entry.id) === n) || null;
+  }
+
+  function databasePickerSelectionLabel(kind, id) {
+    const entry = findDatabasePickerEntry(kind, id);
+    if (!entry) return `ID ${Math.max(0, Number(id || 0))}（未読込または該当なし）`;
+    return `#${entry.id} ${entry.name}`;
+  }
+
+  function openDatabaseIdPicker(options = {}) {
+    const kind = String(options.kind || "");
+    if (!kind) {
+      showToast("選択対象のデータベース種別が不正です");
+      return;
+    }
+    if (!projectAssets.loaded) {
+      showToast("先に上部の『ツクールプロジェクト読込』でプロジェクトを読み込んでください");
+      return;
+    }
+    const entries = listDatabasePickerEntries(kind);
+    if (entries.length <= 0) {
+      showToast(`${databasePickerTitle(kind)} のデータが見つかりません。プロジェクトの data フォルダを確認してください`);
+      return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "image-picker-overlay db-picker-overlay";
+    const dialog = document.createElement("div");
+    dialog.className = "image-picker-dialog db-picker-dialog";
+    overlay.appendChild(dialog);
+
+    const header = document.createElement("div");
+    header.className = "image-picker-header";
+    header.innerHTML = `<strong>${escapeHtml(options.title || databasePickerTitle(kind))}</strong><span>${escapeHtml(projectAssets.name || "ツクールプロジェクト")} / ${escapeHtml(kind)}（${entries.length}件）</span>`;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "閉じる";
+    close.addEventListener("click", () => overlay.remove());
+    header.appendChild(close);
+    dialog.appendChild(header);
+
+    const controls = document.createElement("div");
+    controls.className = "image-picker-controls db-picker-controls";
+    const search = document.createElement("input");
+    search.type = "search";
+    search.placeholder = "ID・名前・説明で検索";
+    controls.appendChild(search);
+    dialog.appendChild(controls);
+
+    const list = document.createElement("div");
+    list.className = "db-picker-list";
+    dialog.appendChild(list);
+
+    const currentId = Math.max(0, Number(options.currentId || 0));
+    const renderList = () => {
+      list.innerHTML = "";
+      const q = search.value.trim().toLowerCase();
+      const filtered = entries.filter(entry => {
+        if (!q) return true;
+        return String(entry.id).includes(q)
+          || String(entry.name || "").toLowerCase().includes(q)
+          || String(entry.detail || "").toLowerCase().includes(q);
+      });
+      if (filtered.length <= 0) {
+        const empty = document.createElement("div");
+        empty.className = "image-picker-empty";
+        empty.textContent = "該当する項目がありません。";
+        list.appendChild(empty);
+        return;
+      }
+      for (const entry of filtered) {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "db-picker-row";
+        if (Number(entry.id) === currentId) row.classList.add("active");
+        row.innerHTML = `<span class="db-picker-id">#${entry.id}</span><span class="db-picker-name">${escapeHtml(entry.name)}</span><span class="db-picker-detail">${escapeHtml(entry.detail || "")}</span>`;
+        row.addEventListener("click", () => {
+          if (typeof options.onSelect === "function") options.onSelect(Number(entry.id), entry);
+          overlay.remove();
+        });
+        list.appendChild(row);
+      }
+    };
+    search.addEventListener("input", renderList);
+    renderList();
+    overlay.addEventListener("click", ev => { if (ev.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    setTimeout(() => search.focus(), 0);
+  }
+
   function databaseFieldOptionsForSource(sourceType, objectType = "item") {
     const actor = [
       ["name", "名前"], ["nickname", "二つ名"], ["profile", "プロフィール"], ["className", "職業名"],
@@ -8722,8 +8955,40 @@ ${choiceRuleStructComment()}
         { value: "fixed", label: "固定ID" },
         { value: "variable", label: "変数でID指定" }
       ], value => { db[idModeKey] = value; });
-      if (db[idModeKey] === "variable") addNumberInput(`${labelPrefix}ID変数`, db[idVarKey] || 1, value => { db[idVarKey] = Math.max(0, value); }, 0);
-      else addNumberInput(`${labelPrefix}ID`, db[idKey] || 1, value => { db[idKey] = Math.max(0, value); }, 0);
+      const pickerKind = databasePickerKindFromBinding(db[sourceKey], db[objectKey], db[typeCategoryKey]);
+      if (db[idModeKey] === "variable") {
+        addReadonly(`${labelPrefix}選択中のID変数`, databasePickerSelectionLabel("variable", db[idVarKey] || 1));
+        addNumberInput(`${labelPrefix}ID変数`, db[idVarKey] || 1, value => { db[idVarKey] = Math.max(0, value); }, 0);
+        addButtonControl(`${labelPrefix}変数を一覧から選択`, () => {
+          openDatabaseIdPicker({
+            kind: "variable",
+            title: "ID変数を選択",
+            currentId: db[idVarKey] || 1,
+            onSelect: (id) => {
+              runStateMutation(`${labelPrefix}ID変数選択`, () => {
+                db[idVarKey] = Math.max(0, Number(id) || 0);
+              });
+            }
+          });
+        });
+      } else {
+        addReadonly(`${labelPrefix}選択中`, pickerKind ? databasePickerSelectionLabel(pickerKind, db[idKey] || 1) : `ID ${db[idKey] || 1}`);
+        addNumberInput(`${labelPrefix}ID`, db[idKey] || 1, value => { db[idKey] = Math.max(0, value); }, 0);
+        if (pickerKind) {
+          addButtonControl(`${labelPrefix}一覧から選択`, () => {
+            openDatabaseIdPicker({
+              kind: pickerKind,
+              title: databasePickerTitle(pickerKind),
+              currentId: db[idKey] || 1,
+              onSelect: (id) => {
+                runStateMutation(`${labelPrefix}ID選択`, () => {
+                  db[idKey] = Math.max(0, Number(id) || 0);
+                });
+              }
+            });
+          });
+        }
+      }
     }
 
     if (db[sourceKey] === "type") {
@@ -13747,6 +14012,7 @@ ${choiceRuleStructComment()}
         debugLog("error", "System.json の読込に失敗しました。", { message: e.message, stack: e.stack });
       }
     }
+    await loadProjectDatabaseTables();
     await loadProjectFont(fileListForFont);
     debugLog("info", options.fromRestore ? "保存済みプロジェクトディレクトリから再読込しました。" : "ツクールプロジェクト読込が完了しました。", {
       projectName: projectAssets.name,
