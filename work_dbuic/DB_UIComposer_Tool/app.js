@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.64";
+  const TOOL_VERSION = "0.4.65";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -4475,6 +4475,61 @@
     }, extra || {});
   }
 
+  function sampleDatabaseBinding(overrides = {}) {
+    return Object.assign(createDefaultDatabaseBinding(), { enabled: true }, overrides || {});
+  }
+
+  function sampleBoundTextItem(id, x, y, fallbackText, fontSize, width, bindingOverrides, extra = {}) {
+    return sampleTextItem(id, x, y, fallbackText, fontSize, width, Object.assign({
+      databaseBinding: sampleDatabaseBinding(bindingOverrides)
+    }, extra || {}));
+  }
+
+  function sampleBoundGaugeItem(id, x, y, width, height, label, color1, color2, bindingOverrides, shape = "horizontal", direction = "leftToRight", startAngle = 0) {
+    const item = sampleGaugeItem(id, x, y, width, height, 50, 100, label || "", color1, color2, shape, direction, startAngle);
+    item.databaseBinding = sampleDatabaseBinding(bindingOverrides);
+    return item;
+  }
+
+  function sampleActorGaugeBinding(fieldPath, maxFieldPath, actorId = 1) {
+    return {
+      sourceType: "actor",
+      idMode: "fixed",
+      id: actorId,
+      fieldPath,
+      maxSourceType: "actor",
+      maxIdMode: "fixed",
+      maxId: actorId,
+      maxFieldPath,
+      maxFallback: 100,
+      updateTiming: "autoFrame"
+    };
+  }
+
+  function sampleChoiceListItem(id, x, y, width, choices, extra = {}) {
+    const base = createDefaultChoiceListItem("tool");
+    base.id = id;
+    base.type = "choiceList";
+    base.x = x;
+    base.y = y;
+    base.width = width;
+    base.choices = choices.slice();
+    base.choiceRules = choices.map(text => ({
+      text,
+      conditionType: "always",
+      trueState: "enabled",
+      falseState: "hidden",
+      switchId: 0,
+      variableId: 0,
+      compareValue: 0,
+      script: ""
+    }));
+    base.choiceEnabled = choices.map(() => true);
+    base.zOrder = 0;
+    base.visible = true;
+    return Object.assign(base, extra || {});
+  }
+
   function createSampleSceneTemplates() {
     return [
       {
@@ -4540,34 +4595,81 @@
         }
       },
       {
-        id: "basicSaveReuse",
+        id: "basicDatabaseBinding",
         kind: "scene",
         category: "basic",
-        name: "基礎編 03：保存/読込と再利用",
-        description: "サンプル編集後の保存や、部品としての再利用手順を確認できます。",
+        name: "基礎編 03：データベース代入",
+        description: "テキスト/ゲージへのデータベース代入（アクター・アイテム・用語・所持金）を掘り下げる基礎サンプルです。",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Basic_03_SaveReuse", name: "Basic_03_SaveReuse", groupIds: ["tutorial_reuse", "tutorial_save_targets"], includeUngrouped: false },
+          scene: {
+            id: "Basic_03_DatabaseBinding",
+            name: "Basic_03_DatabaseBinding",
+            groupIds: ["db_intro", "db_text_demo", "db_gauge_demo"],
+            includeUngrouped: false
+          },
           groups: [
-            { id: "tutorial_reuse", name: "保存読込の説明", visible: true, locked: false },
-            { id: "tutorial_save_targets", name: "保存して試す部品", visible: true, locked: false }
+            { id: "db_intro", name: "1 代入の考え方", visible: true, locked: false },
+            { id: "db_text_demo", name: "2 テキストへの代入", visible: true, locked: false },
+            { id: "db_gauge_demo", name: "3 ゲージへの代入", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Reuse_Guide_Window", "tutorial_reuse", 38, 40, 742, 206, [
-              sampleTextItem("Reuse_Title", 20, 12, "保存・読込チュートリアル", 28, 380, { color: "#ffffff" }),
-              sampleTextItem("Reuse_1", 24, 62, "1. このサンプルを読み込んで編集", 16, 680, { color: "#ffffff" }),
-              sampleTextItem("Reuse_2", 24, 96, "2. サンプル管理画面で『現在シーンを保存』", 16, 680, { color: "#ffffff" }),
-              sampleTextItem("Reuse_3", 24, 130, "3. 壊れたら同画面の『初期化』で復元", 16, 680, { color: "#ffffff" })
+            sampleWindowBase("Db_Intro_Window", "db_intro", 28, 18, 760, 132, [
+              sampleTextItem("Db_Title", 18, 10, "データベース代入とは", 26, 420, { color: "#ffffff" }),
+              sampleTextItem("Db_Body1", 20, 48, "固定文字の代わりに、アクター/アイテム/用語/所持金などの値をパーツへ流し込みます。", 15, 710, { color: "#dce8ff" }),
+              sampleTextItem("Db_Body2", 20, 76, "設定手順：データ元 → ID → 項目名 →（必要なら）接頭語/接尾語。挿入文字は選択中IDのプレビューです。", 15, 710, { color: "#b8ffce" }),
+              sampleTextItem("Db_Body3", 20, 104, "プロパティの『データベース』をONにすると、下のデモと同じ参照が使えます。", 15, 710, { color: "#ffe7a0" })
+            ], { opacity: 215 }),
+            sampleWindowBase("Db_Actor_Text_Window", "db_text_demo", 28, 164, 372, 214, [
+              sampleTextItem("Db_Actor_H", 16, 10, "アクター代入", 20, 200, { color: "#ffe7a0" }),
+              sampleTextItem("Db_Actor_Hint", 16, 40, "ID1の名前 / 職業 / レベル", 13, 330, { color: "#9fb0c8" }),
+              sampleBoundTextItem("Db_Actor_Name", 18, 68, "名前", 24, 320, {
+                sourceType: "actor", id: 1, fieldPath: "name"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Db_Actor_Class", 18, 108, "職業", 16, 320, {
+                sourceType: "actor", id: 1, fieldPath: "className", textPrefix: "職業："
+              }, { color: "#cfe0ff" }),
+              sampleBoundTextItem("Db_Actor_Level", 18, 144, "Lv", 18, 160, {
+                sourceType: "actor", id: 1, fieldPath: "level", textPrefix: "Lv "
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Db_Actor_Nick", 18, 176, "二つ名", 15, 320, {
+                sourceType: "actor", id: 1, fieldPath: "nickname", textPrefix: "二つ名："
+              }, { color: "#d0e4ff" })
             ]),
-            sampleWindowBase("Reusable_Status_Block", "tutorial_save_targets", 76, 286, 304, 170, [
-              sampleTextItem("Reusable_Name", 18, 14, "再利用用ステータス部品", 20, 230, { color: "#ffffff" }),
-              sampleTextItem("Reusable_Hp_Label", 20, 62, "HP", 16, 40, { color: "#ffc0c0" }),
-              sampleGaugeItem("Reusable_Hp", 64, 66, 190, 14, 62, 100, "", "#ff6060", "#ffb0b0", "horizontal", "leftToRight")
-            ], { opacity: 220 }),
-            sampleWindowBase("Reusable_Image_Block", "tutorial_save_targets", 428, 286, 256, 170, [
-              sampleImagePlaceholderItem("Reusable_Image_Slot", 20, 24, 100, 100, "好みのアイコン/立ち絵を設定"),
-              sampleTextItem("Reusable_Image_Note", 132, 54, "画像差し替え用\nスロット", 14, 96, { align: "center", color: "#cfe0ff" })
+            sampleWindowBase("Db_Item_Term_Window", "db_text_demo", 416, 164, 372, 214, [
+              sampleTextItem("Db_Item_H", 16, 10, "アイテム / 用語 / 所持金", 18, 330, { color: "#b8d4ff" }),
+              sampleBoundTextItem("Db_Item_Icon", 18, 48, "\\I[1]", 22, 48, {
+                sourceType: "databaseObject", objectType: "item", id: 1, fieldPath: "iconIndex"
+              }),
+              sampleBoundTextItem("Db_Item_Name", 68, 52, "アイテム名", 18, 260, {
+                sourceType: "databaseObject", objectType: "item", id: 1, fieldPath: "name"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Db_Item_Desc", 18, 92, "説明", 14, 330, {
+                sourceType: "databaseObject", objectType: "item", id: 1, fieldPath: "description"
+              }, { color: "#dce8ff" }),
+              sampleBoundTextItem("Db_Term_Fight", 18, 136, "戦う", 16, 200, {
+                sourceType: "term", termCategory: "commands", termKey: "0", textPrefix: "用語："
+              }, { color: "#ffe7a0" }),
+              sampleBoundTextItem("Db_Gold", 18, 170, "0 G", 18, 300, {
+                sourceType: "gold", textSuffix: " G"
+              }, { color: "#fff0a8" })
+            ]),
+            sampleWindowBase("Db_Gauge_Window", "db_gauge_demo", 28, 396, 760, 168, [
+              sampleTextItem("Db_Gauge_H", 18, 10, "ゲージ代入（現在値＋最大値を別項目で参照）", 18, 520, { color: "#ffc0c0" }),
+              sampleTextItem("Db_Hp_Label", 24, 48, "HP", 16, 40, { color: "#ffc0c0" }),
+              sampleBoundGaugeItem("Db_Hp_Gauge", 70, 52, 280, 16, "", "#ff5a5a", "#ffb0b0", sampleActorGaugeBinding("hp", "mhp")),
+              sampleBoundTextItem("Db_Hp_Value", 370, 48, "0", 16, 70, {
+                sourceType: "actor", id: 1, fieldPath: "hp", textSuffix: " /"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Db_Hp_Max", 450, 48, "0", 16, 80, {
+                sourceType: "actor", id: 1, fieldPath: "mhp"
+              }, { color: "#ffffff" }),
+              sampleTextItem("Db_Mp_Label", 24, 92, "MP", 16, 40, { color: "#b8d4ff" }),
+              sampleBoundGaugeItem("Db_Mp_Gauge", 70, 96, 280, 16, "", "#4b8bff", "#b8d4ff", sampleActorGaugeBinding("mp", "mmp")),
+              sampleTextItem("Db_Tp_Label", 24, 132, "TP", 16, 40, { color: "#ffe7a0" }),
+              sampleBoundGaugeItem("Db_Tp_Circle", 70, 118, 46, 46, "", "#ffd15a", "#fff0a8", sampleActorGaugeBinding("tp", "maxTp"), "circle", "clockwise", 0),
+              sampleTextItem("Db_Gauge_Note", 140, 132, "プロパティ『値』内のデータベース参照で、現在値と最大値を個別指定できます。", 13, 580, { color: "#9fb0c8" })
             ], { opacity: 220 })
           ]
         }
@@ -4576,12 +4678,17 @@
         id: "advStatusMenu",
         kind: "scene",
         category: "advanced",
-        name: "応用編 01：ステータスメニュー構成",
-        description: "実ゲームのステータス画面を想定した改変用サンプルです。",
+        name: "応用編 01：オリジナルステータス画面",
+        description: "データベース代入でアクター情報を自動表示する、オリジナルステータス画面の改変用サンプルです。",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Adv_StatusMenu", name: "Adv_StatusMenu", groupIds: ["status_root", "actor_info", "gauge_group", "param_group"], includeUngrouped: false },
+          scene: {
+            id: "Adv_StatusMenu",
+            name: "Adv_StatusMenu",
+            groupIds: ["status_root", "actor_info", "gauge_group", "param_group"],
+            includeUngrouped: false
+          },
           groups: [
             { id: "status_root", name: "背景・立ち絵枠", visible: true, locked: false },
             { id: "actor_info", name: "名前・職業ブロック", visible: true, locked: false },
@@ -4589,67 +4696,94 @@
             { id: "param_group", name: "能力値リスト", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Status_Background_Window", "status_root", 40, 36, 736, 520, [
-              sampleTextItem("Status_Title", 22, 14, "STATUS", 30, 240, { color: "#ffffff" }),
-              sampleImagePlaceholderItem("Status_BG_Slot", 22, 72, 690, 430, "背景画像を設定してください"),
-              sampleTextItem("Status_BG_Note", 26, 80, "背景画像スロット", 14, 180, { color: "#a8bad8" })
-            ], { opacity: 210 }),
-            sampleWindowBase("Actor_Stand_Window", "status_root", 62, 118, 220, 360, [
+            sampleWindowBase("Status_Background_Window", "status_root", 40, 28, 736, 536, [
+              sampleTextItem("Status_Title", 22, 12, "STATUS", 28, 200, { color: "#ffffff" }),
+              sampleBoundTextItem("Status_Gold", 520, 18, "0 G", 16, 180, {
+                sourceType: "gold", textPrefix: "所持金 ", textSuffix: " G"
+              }, { color: "#fff0a8", align: "right" }),
+              sampleImagePlaceholderItem("Status_BG_Slot", 22, 56, 690, 450, "背景画像を設定してください")
+            ], { opacity: 200 }),
+            sampleWindowBase("Actor_Stand_Window", "status_root", 62, 110, 220, 380, [
               sampleImagePlaceholderItem("Actor_Stand_Slot", 12, 12, 190, 300, "立ち絵画像を設定してください"),
-              sampleTextItem("Stand_Note", 18, 320, "立ち絵差し替え用", 14, 180, { align: "center", color: "#9fb0c8" })
+              sampleBoundTextItem("Stand_Name", 12, 330, "名前", 18, 190, {
+                sourceType: "actor", id: 1, fieldPath: "name"
+              }, { align: "center", color: "#ffffff" })
             ]),
-            sampleWindowBase("Actor_Info_Window", "actor_info", 310, 108, 420, 116, [
-              sampleTextItem("Actor_Name", 22, 12, "主人公", 28, 180, { color: "#ffffff" }),
-              sampleTextItem("Actor_Level", 250, 18, "Lv 12", 22, 100, { color: "#ffffff" }),
-              sampleTextItem("Actor_Class", 24, 58, "クラス：見習い冒険者", 18, 260, { color: "#cfe0ff" })
+            sampleWindowBase("Actor_Info_Window", "actor_info", 310, 100, 430, 118, [
+              sampleBoundTextItem("Actor_Name", 18, 12, "主人公", 28, 220, {
+                sourceType: "actor", id: 1, fieldPath: "name"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Actor_Level", 270, 18, "Lv 1", 22, 120, {
+                sourceType: "actor", id: 1, fieldPath: "level", textPrefix: "Lv "
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Actor_Class", 20, 56, "職業", 17, 280, {
+                sourceType: "actor", id: 1, fieldPath: "className", textPrefix: "職業："
+              }, { color: "#cfe0ff" }),
+              sampleBoundTextItem("Actor_Nick", 20, 86, "二つ名", 14, 360, {
+                sourceType: "actor", id: 1, fieldPath: "nickname"
+              }, { color: "#9fb0c8" })
             ]),
-            sampleWindowBase("Gauge_Window", "gauge_group", 310, 242, 420, 160, [
-              sampleTextItem("Hp_Label", 20, 16, "HP", 18, 50, { color: "#ffc0c0" }),
-              sampleGaugeItem("Hp_Gauge", 70, 20, 250, 16, 75, 100, "", "#ff5a5a", "#ffb0b0"),
-              sampleTextItem("Mp_Label", 20, 52, "MP", 18, 50, { color: "#b8d4ff" }),
-              sampleGaugeItem("Mp_Gauge", 70, 56, 250, 16, 42, 80, "", "#4b8bff", "#b8d4ff"),
-              sampleTextItem("Tp_Label", 338, 18, "TP", 16, 50, { align: "center", color: "#ffe7a0" }),
-              sampleGaugeItem("Tp_Circle", 332, 42, 58, 58, 35, 100, "", "#ffd15a", "#fff0a8", "circle", "clockwise", 0)
+            sampleWindowBase("Gauge_Window", "gauge_group", 310, 236, 430, 156, [
+              sampleBoundTextItem("Hp_Term", 18, 12, "HP", 16, 50, {
+                sourceType: "term", termCategory: "basic", termKey: "2"
+              }, { color: "#ffc0c0" }),
+              sampleBoundGaugeItem("Hp_Gauge", 70, 16, 250, 16, "", "#ff5a5a", "#ffb0b0", sampleActorGaugeBinding("hp", "mhp")),
+              sampleBoundTextItem("Mp_Term", 18, 52, "MP", 16, 50, {
+                sourceType: "term", termCategory: "basic", termKey: "4"
+              }, { color: "#b8d4ff" }),
+              sampleBoundGaugeItem("Mp_Gauge", 70, 56, 250, 16, "", "#4b8bff", "#b8d4ff", sampleActorGaugeBinding("mp", "mmp")),
+              sampleBoundTextItem("Tp_Term", 344, 12, "TP", 14, 50, {
+                sourceType: "term", termCategory: "basic", termKey: "6"
+              }, { align: "center", color: "#ffe7a0" }),
+              sampleBoundGaugeItem("Tp_Circle", 338, 36, 58, 58, "", "#ffd15a", "#fff0a8", sampleActorGaugeBinding("tp", "maxTp"), "circle", "clockwise", 0),
+              sampleBoundTextItem("Exp_Label", 18, 100, "EXP", 14, 50, {
+                sourceType: "term", termCategory: "basic", termKey: "8"
+              }, { color: "#b8ffce" }),
+              sampleBoundTextItem("Exp_Value", 70, 100, "0", 14, 280, {
+                sourceType: "actor", id: 1, fieldPath: "currentExp", textPrefix: "現在 ", textSuffix: "  / 次 "
+              }, { color: "#dce8ff" }),
+              sampleBoundTextItem("Exp_Next", 300, 100, "0", 14, 100, {
+                sourceType: "actor", id: 1, fieldPath: "nextRequiredExp"
+              }, { color: "#dce8ff" })
             ]),
-            sampleWindowBase("Parameter_Window", "param_group", 310, 420, 420, 92, [
-              sampleTextItem("Param_ATK", 20, 10, "攻撃  24", 18, 120),
-              sampleTextItem("Param_DEF", 160, 10, "防御  18", 18, 120),
-              sampleTextItem("Param_MAT", 20, 42, "魔法  31", 18, 120),
-              sampleTextItem("Param_AGI", 160, 42, "敏捷  22", 18, 120)
+            sampleWindowBase("Parameter_Window", "param_group", 310, 410, 430, 130, [
+              sampleBoundTextItem("Param_ATK_L", 18, 12, "攻撃力", 15, 90, {
+                sourceType: "term", termCategory: "params", termKey: "2"
+              }, { color: "#cfe0ff" }),
+              sampleBoundTextItem("Param_ATK", 120, 12, "0", 15, 70, {
+                sourceType: "actor", id: 1, fieldPath: "param[2]"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Param_DEF_L", 220, 12, "防御力", 15, 90, {
+                sourceType: "term", termCategory: "params", termKey: "3"
+              }, { color: "#cfe0ff" }),
+              sampleBoundTextItem("Param_DEF", 320, 12, "0", 15, 70, {
+                sourceType: "actor", id: 1, fieldPath: "param[3]"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Param_MAT_L", 18, 48, "魔法力", 15, 90, {
+                sourceType: "term", termCategory: "params", termKey: "4"
+              }, { color: "#cfe0ff" }),
+              sampleBoundTextItem("Param_MAT", 120, 48, "0", 15, 70, {
+                sourceType: "actor", id: 1, fieldPath: "param[4]"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Param_MDF_L", 220, 48, "魔法防御", 15, 90, {
+                sourceType: "term", termCategory: "params", termKey: "5"
+              }, { color: "#cfe0ff" }),
+              sampleBoundTextItem("Param_MDF", 320, 48, "0", 15, 70, {
+                sourceType: "actor", id: 1, fieldPath: "param[5]"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Param_AGI_L", 18, 84, "敏捷性", 15, 90, {
+                sourceType: "term", termCategory: "params", termKey: "6"
+              }, { color: "#cfe0ff" }),
+              sampleBoundTextItem("Param_AGI", 120, 84, "0", 15, 70, {
+                sourceType: "actor", id: 1, fieldPath: "param[6]"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Param_LUK_L", 220, 84, "運", 15, 90, {
+                sourceType: "term", termCategory: "params", termKey: "7"
+              }, { color: "#cfe0ff" }),
+              sampleBoundTextItem("Param_LUK", 320, 84, "0", 15, 70, {
+                sourceType: "actor", id: 1, fieldPath: "param[7]"
+              }, { color: "#ffffff" })
             ])
-          ]
-        }
-      },
-      {
-        id: "advBattleHud",
-        kind: "scene",
-        category: "advanced",
-        name: "応用編 02：戦闘HUD構成",
-        description: "戦闘中UI（HP/MPや敵情報表示）を想定した改変用サンプルです。",
-        savedAt: "sample",
-        version: TOOL_VERSION,
-        data: {
-          scene: { id: "Adv_BattleHud", name: "Adv_BattleHud", groupIds: ["hud_player", "hud_enemy", "hud_fx"], includeUngrouped: false },
-          groups: [
-            { id: "hud_player", name: "プレイヤーHUD", visible: true, locked: false },
-            { id: "hud_enemy", name: "敵表示", visible: true, locked: false },
-            { id: "hud_fx", name: "演出ラベル", visible: true, locked: false }
-          ],
-          windows: [
-            sampleWindowBase("PlayerHud_Window", "hud_player", 24, 468, 430, 132, [
-              sampleImagePlaceholderItem("PlayerFace_Slot", 12, 12, 96, 96, "顔グラ差し替え"),
-              sampleTextItem("Player_Name", 124, 14, "主人公", 22, 180, { color: "#ffffff" }),
-              sampleGaugeItem("Battle_HP", 124, 50, 250, 14, 78, 100, "", "#ff5a5a", "#ffb0b0"),
-              sampleGaugeItem("Battle_MP", 124, 76, 250, 14, 44, 100, "", "#4b8bff", "#b8d4ff")
-            ], { opacity: 215 }),
-            sampleWindowBase("EnemyHud_Window", "hud_enemy", 504, 32, 288, 180, [
-              sampleImagePlaceholderItem("EnemyPortrait_Slot", 20, 18, 112, 112, "敵画像差し替え"),
-              sampleTextItem("Enemy_Name", 146, 26, "Enemy", 20, 120, { color: "#ffffff" }),
-              sampleGaugeItem("Enemy_HP", 146, 62, 118, 12, 55, 100, "", "#ff6a6a", "#ffc0c0")
-            ]),
-            sampleWindowBase("BattleFx_Window", "hud_fx", 266, 24, 250, 56, [
-              sampleTextItem("Fx_Label", 16, 12, "CRITICAL!", 30, 220, { align: "center", color: "#ffe17d" })
-            ], { opacity: 150 })
           ]
         }
       },
@@ -4657,29 +4791,172 @@
         id: "advDialogueChoice",
         kind: "scene",
         category: "advanced",
-        name: "応用編 03：会話 + 選択肢UI",
-        description: "会話ウィンドウ・立ち絵・選択肢を組み合わせた実戦サンプルです。",
+        name: "応用編 02：オリジナル選択肢UI",
+        description: "会話・立ち絵・選択肢に、アクター/アイテム/所持金のデータベース代入を組み合わせたサンプルです。",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Adv_DialogueChoice", name: "Adv_DialogueChoice", groupIds: ["dialogue_bg", "dialogue_message", "dialogue_choices"], includeUngrouped: false },
+          scene: {
+            id: "Adv_DialogueChoice",
+            name: "Adv_DialogueChoice",
+            groupIds: ["dialogue_bg", "dialogue_message", "dialogue_choices", "dialogue_detail"],
+            includeUngrouped: false
+          },
           groups: [
             { id: "dialogue_bg", name: "背景・立ち絵", visible: true, locked: false },
             { id: "dialogue_message", name: "会話ウィンドウ", visible: true, locked: false },
-            { id: "dialogue_choices", name: "選択肢", visible: true, locked: false }
+            { id: "dialogue_choices", name: "選択肢", visible: true, locked: false },
+            { id: "dialogue_detail", name: "選択内容の詳細", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Dialogue_Background_Window", "dialogue_bg", 22, 20, 772, 372, [
-              sampleImagePlaceholderItem("Dialogue_BG_Slot", 12, 12, 744, 344, "背景画像を設定"),
-              sampleImagePlaceholderItem("Dialogue_Stand_Slot", 490, 32, 250, 314, "立ち絵を設定")
-            ], { opacity: 200 }),
-            sampleWindowBase("Dialogue_Message_Window", "dialogue_message", 30, 404, 760, 152, [
-              sampleTextItem("Speaker_Name", 18, 12, "案内役", 22, 180, { color: "#ffe7a0" }),
-              sampleTextItem("Message_Line", 20, 54, "ここに会話文を表示します。改行して複数行にもできます。", 18, 700, { color: "#ffffff" })
+            sampleWindowBase("Dialogue_Background_Window", "dialogue_bg", 22, 16, 772, 300, [
+              sampleImagePlaceholderItem("Dialogue_BG_Slot", 12, 12, 744, 272, "背景画像を設定"),
+              sampleImagePlaceholderItem("Dialogue_Stand_Slot", 500, 24, 230, 250, "立ち絵を設定")
+            ], { opacity: 195 }),
+            sampleWindowBase("Dialogue_Message_Window", "dialogue_message", 28, 330, 500, 140, [
+              sampleBoundTextItem("Speaker_Name", 16, 10, "案内役", 20, 220, {
+                sourceType: "actor", id: 1, fieldPath: "name"
+              }, { color: "#ffe7a0" }),
+              sampleBoundTextItem("Speaker_Class", 250, 14, "職業", 14, 220, {
+                sourceType: "actor", id: 1, fieldPath: "className", textPrefix: "（", textSuffix: "）"
+              }, { color: "#9fb0c8" }),
+              sampleTextItem("Message_Line", 18, 48, "どうしますか？ 所持金とアイテム情報は右パネルに代入表示しています。", 16, 450, { color: "#ffffff" }),
+              sampleBoundTextItem("Message_Gold", 18, 100, "0 G", 15, 300, {
+                sourceType: "gold", textPrefix: "所持金：", textSuffix: " G"
+              }, { color: "#fff0a8" })
             ]),
-            sampleWindowBase("Dialogue_Choice_Window", "dialogue_choices", 548, 250, 230, 132, [
-              { type: "choiceList", id: "Dialogue_Choices", x: 16, y: 16, width: 190, lineHeight: 30, choices: ["はい", "いいえ", "あとで"], zOrder: 0, visible: true }
-            ], { opacity: 218 })
+            sampleWindowBase("Dialogue_Choice_Window", "dialogue_choices", 548, 330, 246, 140, [
+              sampleChoiceListItem("Dialogue_Choices", 12, 12, 210, ["買う", "売る", "やめる"], {
+                rowHeight: 34,
+                fontSize: 18,
+                maxVisibleRows: 3
+              })
+            ], { opacity: 225 }),
+            sampleWindowBase("Dialogue_Detail_Window", "dialogue_detail", 28, 486, 766, 86, [
+              sampleTextItem("Detail_H", 16, 10, "注目アイテム（データベース代入）", 14, 280, { color: "#b8d4ff" }),
+              sampleBoundTextItem("Detail_Icon", 16, 40, "\\I[1]", 20, 40, {
+                sourceType: "databaseObject", objectType: "item", id: 1, fieldPath: "iconIndex"
+              }),
+              sampleBoundTextItem("Detail_Name", 60, 42, "アイテム", 16, 180, {
+                sourceType: "databaseObject", objectType: "item", id: 1, fieldPath: "name"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Detail_Price", 250, 42, "0", 16, 120, {
+                sourceType: "databaseObject", objectType: "item", id: 1, fieldPath: "price", textPrefix: "価格 ", textSuffix: ""
+              }, { color: "#fff0a8" }),
+              sampleBoundTextItem("Detail_Desc", 390, 40, "説明", 14, 350, {
+                sourceType: "databaseObject", objectType: "item", id: 1, fieldPath: "description"
+              }, { color: "#dce8ff" })
+            ], { opacity: 220 })
+          ]
+        }
+      },
+      {
+        id: "advActionHud",
+        kind: "scene",
+        category: "advanced",
+        name: "応用編 03：アクションゲーム風UI",
+        description: "画面端のHUD配置に、アクター/スキル/エネミーのデータベース代入を組み合わせたアクション想定サンプルです。",
+        savedAt: "sample",
+        version: TOOL_VERSION,
+        data: {
+          scene: {
+            id: "Adv_ActionHud",
+            name: "Adv_ActionHud",
+            groupIds: ["action_player", "action_skill", "action_enemy", "action_log"],
+            includeUngrouped: false
+          },
+          groups: [
+            { id: "action_player", name: "プレイヤーHUD", visible: true, locked: false },
+            { id: "action_skill", name: "スキルショートカット", visible: true, locked: false },
+            { id: "action_enemy", name: "ボス/敵表示", visible: true, locked: false },
+            { id: "action_log", name: "アクションログ", visible: true, locked: false }
+          ],
+          windows: [
+            sampleWindowBase("Action_Player_Window", "action_player", 18, 430, 320, 146, [
+              sampleImagePlaceholderItem("Action_Face_Slot", 12, 14, 84, 84, "顔グラ差し替え"),
+              sampleBoundTextItem("Action_Name", 110, 12, "Player", 18, 180, {
+                sourceType: "actor", id: 1, fieldPath: "name"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Action_Lv", 110, 40, "Lv 1", 13, 100, {
+                sourceType: "actor", id: 1, fieldPath: "level", textPrefix: "Lv "
+              }, { color: "#cfe0ff" }),
+              sampleBoundGaugeItem("Action_HP", 110, 66, 180, 12, "", "#ff4d4d", "#ffb0b0", sampleActorGaugeBinding("hp", "mhp")),
+              sampleBoundGaugeItem("Action_MP", 110, 88, 180, 10, "", "#4b8bff", "#b8d4ff", sampleActorGaugeBinding("mp", "mmp")),
+              sampleBoundGaugeItem("Action_TP", 12, 108, 70, 70, "", "#ffd15a", "#fff0a8", sampleActorGaugeBinding("tp", "maxTp"), "circle", "clockwise", 0),
+              sampleBoundTextItem("Action_Gold", 110, 112, "0", 13, 180, {
+                sourceType: "gold", textPrefix: "GOLD ", textSuffix: ""
+              }, { color: "#fff0a8" })
+            ], { opacity: 200, frameVisible: false, backgroundType: "dim" }),
+            sampleWindowBase("Action_Skill_Window", "action_skill", 352, 456, 430, 120, [
+              sampleTextItem("Skill_H", 14, 8, "SKILL", 14, 80, { color: "#9fb0c8" }),
+              sampleBoundTextItem("Skill1_Icon", 16, 36, "\\I[1]", 22, 36, {
+                sourceType: "databaseObject", objectType: "skill", id: 1, fieldPath: "iconIndex"
+              }),
+              sampleBoundTextItem("Skill1_Name", 54, 40, "スキル1", 14, 120, {
+                sourceType: "databaseObject", objectType: "skill", id: 1, fieldPath: "name"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Skill1_Cost", 54, 62, "0", 12, 120, {
+                sourceType: "databaseObject", objectType: "skill", id: 1, fieldPath: "mpCost", textPrefix: "MP "
+              }, { color: "#b8d4ff" }),
+              sampleBoundTextItem("Skill2_Icon", 190, 36, "\\I[1]", 22, 36, {
+                sourceType: "databaseObject", objectType: "skill", id: 2, fieldPath: "iconIndex"
+              }),
+              sampleBoundTextItem("Skill2_Name", 228, 40, "スキル2", 14, 120, {
+                sourceType: "databaseObject", objectType: "skill", id: 2, fieldPath: "name"
+              }, { color: "#ffffff" }),
+              sampleBoundTextItem("Skill2_Cost", 228, 62, "0", 12, 120, {
+                sourceType: "databaseObject", objectType: "skill", id: 2, fieldPath: "mpCost", textPrefix: "MP "
+              }, { color: "#b8d4ff" }),
+              sampleBoundTextItem("Skill3_Icon", 16, 86, "\\I[1]", 18, 30, {
+                sourceType: "databaseObject", objectType: "skill", id: 3, fieldPath: "iconIndex"
+              }),
+              sampleBoundTextItem("Skill3_Name", 48, 88, "スキル3", 13, 160, {
+                sourceType: "databaseObject", objectType: "skill", id: 3, fieldPath: "name"
+              }, { color: "#dce8ff" }),
+              sampleBoundTextItem("State_Name", 230, 88, "状態", 13, 160, {
+                sourceType: "state", id: 1, fieldPath: "name", textPrefix: "状態："
+              }, { color: "#ffc0c0" })
+            ], { opacity: 190, frameVisible: false, backgroundType: "dim" }),
+            sampleWindowBase("Action_Enemy_Window", "action_enemy", 210, 18, 396, 92, [
+              sampleBoundTextItem("Enemy_Name", 16, 10, "BOSS", 18, 240, {
+                sourceType: "enemy", id: 1, fieldPath: "name"
+              }, { color: "#ffffff", align: "center" }),
+              sampleBoundGaugeItem("Enemy_HP", 24, 46, 340, 14, "", "#ff6a6a", "#ffc0c0", {
+                sourceType: "enemy",
+                id: 1,
+                fieldPath: "hp",
+                maxSourceType: "enemy",
+                maxIdMode: "fixed",
+                maxId: 1,
+                maxFieldPath: "mhp",
+                maxFallback: 100
+              }),
+              sampleBoundTextItem("Enemy_Reward", 24, 68, "EXP", 12, 340, {
+                sourceType: "enemy", id: 1, fieldPath: "exp", textPrefix: "撃破報酬 EXP ", textSuffix: ""
+              }, { color: "#b8ffce" })
+            ], { opacity: 185, frameVisible: false, backgroundType: "dim" }),
+            sampleWindowBase("Action_Log_Window", "action_log", 620, 430, 164, 146, [
+              {
+                type: "log",
+                id: "Action_Log",
+                x: 8,
+                y: 8,
+                width: 140,
+                height: 120,
+                fontSize: 13,
+                lineHeight: 20,
+                color: "#ffffff",
+                paddingX: 4,
+                paddingY: 4,
+                maxLines: 5,
+                lineVisibleFrames: 180,
+                fadeFrames: 24,
+                moveFrames: 16,
+                sampleText: "ダッシュ！\nスキル発動\nダメージ表示",
+                zOrder: 0,
+                visible: true
+              }
+            ], { opacity: 170, frameVisible: false, backgroundType: "dim" })
           ]
         }
       }
@@ -8925,11 +9202,11 @@ ${choiceRuleStructComment()}
     return (optionsList || []).map(opt => {
       const fieldPath = String(opt.value || "");
       const currentRaw = previewDatabaseBindingWithField(binding, fieldPath, prefix);
-      // デフォルト = ツクール標準の項目名（名前/消費MP など）
-      const defaultName = String(opt.label || fieldPath || "");
+      // 項目名 = ツクール標準の項目名（名前/消費MP など）
+      const fieldName = String(opt.label || fieldPath || "");
       return Object.assign({}, opt, {
         currentText: formatDatabaseListSample(currentRaw),
-        defaultText: defaultName || "（未設定）"
+        defaultText: fieldName || "（未設定）"
       });
     });
   }
@@ -8939,11 +9216,11 @@ ${choiceRuleStructComment()}
     return (optionsList || []).map(opt => {
       const key = String(opt.value || "");
       const currentRaw = resolveDatabaseTermValue(terms, termCategory, key, 0);
-      // デフォルト = ツクール標準の用語名（戦う/レベル など）
-      const defaultName = String(opt.label || key || "");
+      // 項目名 = ツクール標準の用語名（戦う/レベル など）
+      const fieldName = String(opt.label || key || "");
       return Object.assign({}, opt, {
         currentText: formatDatabaseListSample(currentRaw),
-        defaultText: defaultName || "（未設定）"
+        defaultText: fieldName || "（未設定）"
       });
     });
   }
@@ -8952,10 +9229,10 @@ ${choiceRuleStructComment()}
     const value = String(fieldPath || "").trim();
     const hit = (optionsList || []).find(opt => String(opt.value) === value);
     if (hit) {
-      const defaultName = String(hit.defaultText || hit.label || hit.value || "");
+      const fieldName = String(hit.defaultText || hit.label || hit.value || "");
       const group = String(hit.group || "").trim();
-      const base = group ? `${group} / ${defaultName}` : defaultName;
-      if (hit.currentText) return `${base}　現在:${hit.currentText}`;
+      const base = group ? `${group} / ${fieldName}` : fieldName;
+      if (hit.currentText) return `${base}　挿入文字:${hit.currentText}`;
       return base;
     }
     if (!value) return "未選択";
@@ -8987,14 +9264,14 @@ ${choiceRuleStructComment()}
 
     const legend = document.createElement("div");
     legend.className = "db-field-picker-legend";
-    legend.textContent = "デフォルト = ツクール標準の項目名 / 現在 = 選択中IDのプレビュー値";
+    legend.textContent = "項目名 = ツクール標準の項目名 / 挿入文字 = 選択中IDのプレビュー値";
     dialog.appendChild(legend);
 
     const controls = document.createElement("div");
     controls.className = "image-picker-controls db-picker-controls";
     const search = document.createElement("input");
     search.type = "search";
-    search.placeholder = "種類・デフォルト項目名・現在値で検索";
+    search.placeholder = "種類・項目名・挿入文字で検索";
     controls.appendChild(search);
     dialog.appendChild(controls);
 
@@ -9033,12 +9310,12 @@ ${choiceRuleStructComment()}
         row.innerHTML = `
           <span class="db-picker-id">${escapeHtml(group)}</span>
           <span class="db-picker-values">
-            <span class="db-picker-value-default"><em>デフォルト</em>${escapeHtml(defaultText)}</span>
-            <span class="db-picker-value-current"><em>現在</em>${escapeHtml(currentText)}</span>
+            <span class="db-picker-value-default"><em>項目名</em>${escapeHtml(defaultText)}</span>
+            <span class="db-picker-value-current"><em>挿入文字</em>${escapeHtml(currentText)}</span>
           </span>
           <span class="db-picker-detail">${escapeHtml(entry.detail || entry.value || "")}</span>
         `;
-        row.title = `${group} / デフォルト:${defaultText} / 現在:${currentText}`;
+        row.title = `${group} / 項目名:${defaultText} / 挿入文字:${currentText}`;
         row.addEventListener("click", () => {
           if (typeof options.onSelect === "function") options.onSelect(String(entry.value || ""), entry);
           overlay.remove();
@@ -9499,7 +9776,7 @@ ${choiceRuleStructComment()}
       addReadonlyWithDatabasePicker(
         `${labelPrefix}選択中の用語`,
         termLabel
-          ? `${termLabel.label}　現在:${termLabel.currentText || "（空）"}`
+          ? `${termLabel.label}　挿入文字:${termLabel.currentText || "（空）"}`
           : (currentTerm || "未選択"),
         () => {
           openDatabaseFieldPicker({
