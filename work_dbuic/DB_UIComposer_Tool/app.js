@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.54";
+  const TOOL_VERSION = "0.4.55";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -280,7 +280,17 @@
 
   function ensureDatabaseBinding(item) {
     if (!item || typeof item !== "object") return createDefaultDatabaseBinding();
-    item.databaseBinding = Object.assign(createDefaultDatabaseBinding(), item.databaseBinding || {});
+    // Keep the same object identity. Replacing databaseBinding on every ensure()
+    // breaks property-panel closures that skipProperties re-renders intentionally keep alive
+    // (e.g. textPrefix/textSuffix inputs stop updating the live binding after the first commit).
+    if (!item.databaseBinding || typeof item.databaseBinding !== "object") {
+      item.databaseBinding = createDefaultDatabaseBinding();
+    } else {
+      const defaults = createDefaultDatabaseBinding();
+      for (const key of Object.keys(defaults)) {
+        if (item.databaseBinding[key] === undefined) item.databaseBinding[key] = defaults[key];
+      }
+    }
     const db = item.databaseBinding;
     db.enabled = db.enabled === true;
     if (!["fixed", "variable"].includes(String(db.idMode || ""))) db.idMode = "fixed";
@@ -9027,8 +9037,8 @@ ${choiceRuleStructComment()}
     }
 
     if (mode === "text") {
-      addTextInput("接頭辞", db.textPrefix || "", value => { db.textPrefix = value; });
-      addTextInput("接尾辞", db.textSuffix || "", value => { db.textSuffix = value; });
+      addTextInput("接頭語", db.textPrefix || "", value => { db.textPrefix = value; });
+      addTextInput("接尾語", db.textSuffix || "", value => { db.textSuffix = value; });
       addTextInput("空時の表示", db.emptyText || "", value => { db.emptyText = value; });
       addNumberInput("小数桁数(-1でそのまま)", db.decimals ?? -1, value => { db.decimals = value; }, -1);
     }
