@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.58 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.59 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -65,6 +65,7 @@
  * v0.4.56では、データベース参照の項目選択を別ウィンドウ一覧化し、接尾語表記を統一しています。
  * v0.4.57では、データベース項目一覧を種類別に整理し、人が分かる日本語名で選べるよう改善しています。
  * v0.4.58では、ゲージのデータベース参照UIが『値』セクション内に見えるよう修正しています。
+ * v0.4.59では、データベースのアイコン番号を実際のアイコン表示（\I[n]）へ対応し、drawText系でも描画できるよう改善しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -2223,13 +2224,20 @@
     return resolveObjectPathValue(base, binding?.[fieldKey] || "name");
   };
 
-  const databaseBindingTextValue = binding => {
-    if (!binding || binding.enabled !== true) return null;
-    const raw = databaseBindingRawValue(binding, "");
-    if (raw === null || raw === undefined || raw === "") return String(binding.emptyText || "");
+  const isDatabaseIconIndexField = fieldPath => {
+    const key = String(fieldPath || "").trim();
+    return key === "iconIndex" || /(^|\.)iconIndex$/i.test(key);
+  };
+
+  const formatDatabaseBindingDisplayText = (binding, raw) => {
+    const emptyText = String(binding?.emptyText || "");
+    if (raw === null || raw === undefined || raw === "") return emptyText;
     let text = "";
-    if (typeof raw === "number") {
-      const dec = toNumber(binding.decimals, -1);
+    if (isDatabaseIconIndexField(binding?.fieldPath)) {
+      const iconIndex = Math.max(0, toNumber(raw, 0));
+      text = `\\I[${iconIndex}]`;
+    } else if (typeof raw === "number") {
+      const dec = toNumber(binding?.decimals, -1);
       text = dec >= 0 ? Number(raw).toFixed(Math.max(0, dec)) : String(raw);
     } else if (typeof raw === "string") {
       text = raw;
@@ -2240,7 +2248,13 @@
         text = String(raw);
       }
     }
-    return `${String(binding.textPrefix || "")}${text}${String(binding.textSuffix || "")}`;
+    return `${String(binding?.textPrefix || "")}${text}${String(binding?.textSuffix || "")}`;
+  };
+
+  const databaseBindingTextValue = binding => {
+    if (!binding || binding.enabled !== true) return null;
+    const raw = databaseBindingRawValue(binding, "");
+    return formatDatabaseBindingDisplayText(binding, raw);
   };
 
   const databaseBindingGaugeValues = binding => {
@@ -4243,6 +4257,21 @@
       return bitmap;
     }
 
+    drawDbEscapedAlignedText(text, x, y, width, align = "left", lineHeight = null) {
+      const lh = Math.max(1, toNumber(lineHeight, this.lineHeight ? this.lineHeight() : 36));
+      const style = {
+        fontFace: this.contents.fontFace,
+        fontSize: this.contents.fontSize,
+        bold: !!this.contents.fontBold,
+        italic: !!this.contents.fontItalic,
+        textColor: this.contents.textColor,
+        outlineColor: this.contents.outlineColor,
+        outlineWidth: this.contents.outlineWidth
+      };
+      const converted = this.convertEscapeCharacters(normalizeMZControlPrefix(text));
+      this.dbDrawStableEscapedLine(converted, x, y, Math.max(1, width), lh, align, style);
+    }
+
     drawDbText(item) {
       const settings = this._dbUiLayoutSettings || {};
       const style = this.dbStableTextStyle(item, settings.defaultFontSize || 26);
@@ -4589,7 +4618,7 @@
         else this.resetTextColor();
         if (item.outlineColor) this.contents.outlineColor = String(item.outlineColor);
         if (item.outlineWidth !== undefined) this.contents.outlineWidth = Math.max(0, toNumber(item.outlineWidth, this.contents.outlineWidth));
-        this.drawText(`${this.convertEscapeCharacters(normalizeMZControlPrefix(item.label))} ${values.value}/${values.max}`, x, y - 2 + this.textYOffset(), width, "center");
+        this.drawDbEscapedAlignedText(`${item.label} ${values.value}/${values.max}`, x, y - 2 + this.textYOffset(), width, "center");
         this.contents.fontSize = oldSize;
         this.contents.fontFace = oldFace;
         this.contents.textColor = oldColor;
@@ -4658,8 +4687,8 @@
       const oldContents = this.contents;
       this.contents = bitmap;
       withBitmapFont(bitmap, style, () => {
-        const text = this.convertEscapeCharacters(normalizeMZControlPrefix(String(option.text || option.id || `choice${index + 1}`)));
-        this.drawText(text, 0, Math.floor((height - this.lineHeight()) / 2), width, "center");
+        const text = String(option.text || option.id || `choice${index + 1}`);
+        this.drawDbEscapedAlignedText(text, 0, Math.floor((height - this.lineHeight()) / 2), width, "center");
       });
       this.contents = oldContents;
       this._dbUiImageChoiceTextCache[cacheId] = { key, bitmap };
@@ -4896,8 +4925,8 @@
           const yy = row * (rowHeight + gap);
           const oldRowColor = bitmap.textColor;
           if (entry.state !== "enabled") bitmap.textColor = disabledTextColor;
-          this.drawText(
-            this.convertEscapeCharacters(normalizeMZControlPrefix(entry.text !== undefined ? entry.text : "")),
+          this.drawDbEscapedAlignedText(
+            entry.text !== undefined ? entry.text : "",
             6,
             yy + Math.floor((rowHeight - this.lineHeight()) / 2) + this.textYOffset(),
             Math.max(1, width - 12 - textRightPadding),
@@ -5287,7 +5316,7 @@
       if (String(item.text || "").length > 0) {
         this.contents.paintOpacity = oldPaintOpacity;
         withBitmapFont(this.contents, style, () => {
-          this.drawText(this.convertEscapeCharacters(normalizeMZControlPrefix(item.text || "")), x, y + Math.floor((height - this.lineHeight()) / 2) + this.textYOffset(), width, "center");
+          this.drawDbEscapedAlignedText(item.text || "", x, y + Math.floor((height - this.lineHeight()) / 2) + this.textYOffset(), width, "center");
         });
       }
       this.contents.paintOpacity = oldPaintOpacity;
@@ -6057,7 +6086,7 @@
   });
 
   window.DB_UIComposer = {
-    version: "0.4.58",
+    version: "0.4.59",
     applyLayout,
     refreshScene,
     normalizeLayout,

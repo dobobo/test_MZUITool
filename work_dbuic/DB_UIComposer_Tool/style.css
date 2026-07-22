@@ -1693,6 +1693,15 @@ body.panel-resizing * {
   min-width: 1em;
   text-align: center;
   opacity: .9;
+  line-height: 0;
+}
+
+.preview-inline-icon-fallback {
+  min-width: 2em;
+  line-height: 1.2;
+  font-size: 11px;
+  color: var(--muted);
+  vertical-align: middle;
 }
 
 

@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.58";
+  const TOOL_VERSION = "0.4.59";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -1430,6 +1430,9 @@
       windowSkinUrl: '',
       windowSkinImage: null,
       windowSkinReady: false,
+      iconSetUrl: '',
+      iconSetImage: null,
+      iconSetReady: false,
       fontUrl: '',
       fontStyleEl: null,
       directoryHandle: null,
@@ -9045,7 +9048,7 @@ ${choiceRuleStructComment()}
       ["sparam[8]", "床ダメージ率", "特殊能力値"], ["sparam[9]", "経験獲得率", "特殊能力値"]
     ];
     const itemBase = [
-      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"],
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン", "基本"],
       ["price", "価格", "基本"], ["consumable", "消耗するか", "基本"], ["itypeId", "アイテムタイプID", "基本"],
       ["scope", "効果範囲", "使用効果"], ["occasion", "使用可能時", "使用効果"], ["speed", "速度補正", "使用効果"],
       ["successRate", "成功率", "使用効果"], ["repeats", "連続回数", "使用効果"], ["tpGain", "得TP", "使用効果"],
@@ -9055,7 +9058,7 @@ ${choiceRuleStructComment()}
       ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
     ];
     const skill = [
-      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"],
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン", "基本"],
       ["stypeId", "スキルタイプID", "基本"], ["mpCost", "消費MP", "コスト"], ["tpCost", "消費TP", "コスト"],
       ["scope", "効果範囲", "使用効果"], ["occasion", "使用可能時", "使用効果"], ["speed", "速度補正", "使用効果"],
       ["successRate", "成功率", "使用効果"], ["repeats", "連続回数", "使用効果"], ["tpGain", "得TP", "使用効果"],
@@ -9067,14 +9070,14 @@ ${choiceRuleStructComment()}
       ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
     ];
     const weapon = [
-      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"],
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン", "基本"],
       ["price", "価格", "基本"], ["etypeId", "装備タイプID", "基本"], ["wtypeId", "武器タイプID", "基本"],
       ["animationId", "攻撃アニメーションID", "基本"],
       ...databaseEquipParamFieldRows("装備の能力変化"),
       ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
     ];
     const armor = [
-      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"],
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン", "基本"],
       ["price", "価格", "基本"], ["etypeId", "装備タイプID", "基本"], ["atypeId", "防具タイプID", "基本"],
       ...databaseEquipParamFieldRows("装備の能力変化"),
       ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
@@ -9088,7 +9091,7 @@ ${choiceRuleStructComment()}
       ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
     ];
     const stateRows = [
-      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"], ["priority", "優先度", "基本"],
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン", "基本"], ["priority", "優先度", "基本"],
       ["message1", "付与メッセージ", "メッセージ"], ["message2", "継続メッセージ", "メッセージ"],
       ["message3", "解除メッセージ", "メッセージ"], ["message4", "味方解除メッセージ", "メッセージ"],
       ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
@@ -13539,6 +13542,56 @@ ${choiceRuleStructComment()}
     return map;
   }
 
+
+  function previewIconSize() {
+    return 32;
+  }
+
+  function isDatabaseIconIndexField(fieldPath) {
+    const key = String(fieldPath || "").trim();
+    return key === "iconIndex" || /(^|\.)iconIndex$/i.test(key);
+  }
+
+  function formatDatabaseBindingDisplayText(binding, raw) {
+    const emptyText = String(binding?.emptyText || "");
+    if (raw === null || raw === undefined || raw === "") return emptyText;
+    let text = "";
+    if (isDatabaseIconIndexField(binding?.fieldPath)) {
+      const iconIndex = Math.max(0, Number(raw) || 0);
+      text = `\\I[${iconIndex}]`;
+    } else if (typeof raw === "number") {
+      const dec = Number(binding?.decimals ?? -1);
+      text = dec >= 0 ? raw.toFixed(Math.max(0, dec)) : String(raw);
+    } else if (typeof raw === "string") {
+      text = raw;
+    } else {
+      try { text = JSON.stringify(raw); } catch (_) { text = String(raw); }
+    }
+    return `${String(binding?.textPrefix || "")}${text}${String(binding?.textSuffix || "")}`;
+  }
+
+  function previewInlineIconHtml(iconIndex) {
+    const index = Math.max(0, Number(iconIndex) || 0);
+    const size = previewIconSize();
+    const cols = 16;
+    const sx = (index % cols) * size;
+    const sy = Math.floor(index / cols) * size;
+    if (projectAssets.iconSetReady && projectAssets.iconSetUrl) {
+      const style = [
+        `display:inline-block`,
+        `width:${size}px`,
+        `height:${size}px`,
+        `vertical-align:middle`,
+        `background-image:url(${JSON.stringify(projectAssets.iconSetUrl)})`,
+        `background-repeat:no-repeat`,
+        `background-position:-${sx}px -${sy}px`,
+        `image-rendering:pixelated`
+      ].join(";");
+      return `<span class="preview-inline-icon" style="${style}" title="Icon ${index}"></span>`;
+    }
+    return `<span class="preview-inline-icon preview-inline-icon-fallback" title="Icon ${index}">[${index}]</span>`;
+  }
+
   function normalizeMZControlPrefix(text) {
     // RPGツクールMZのエディタ上では、制御文字の「\」が環境によって
     // 半角円記号/全角円記号の見た目・入力になることがあります。
@@ -13664,7 +13717,7 @@ ${choiceRuleStructComment()}
       if (code === "I") {
         const param = readPreviewBracketNumber(source, paramIndex);
         flush();
-        html += `<span class="preview-inline-icon" title="Icon ${param.value}">□</span>`;
+        html += previewInlineIconHtml(param.value);
         i = param.next;
         continue;
       }
@@ -13832,17 +13885,7 @@ ${choiceRuleStructComment()}
     const binding = ensureDatabaseBinding(item);
     if (!binding.enabled) return null;
     const raw = previewDatabaseRawValue(binding, "");
-    const emptyText = String(binding.emptyText || "");
-    if (raw === null || raw === undefined || raw === "") return emptyText;
-    let text = "";
-    if (typeof raw === "number") {
-      const dec = Number(binding.decimals ?? -1);
-      text = dec >= 0 ? raw.toFixed(Math.max(0, dec)) : String(raw);
-    } else if (typeof raw === "string") text = raw;
-    else {
-      try { text = JSON.stringify(raw); } catch (_) { text = String(raw); }
-    }
-    return `${String(binding.textPrefix || "")}${text}${String(binding.textSuffix || "")}`;
+    return formatDatabaseBindingDisplayText(binding, raw);
   }
 
   function previewDatabaseGaugeValues(item) {
@@ -14295,6 +14338,26 @@ ${choiceRuleStructComment()}
           };
           img.src = url;
           projectAssets.windowSkinImage = img;
+        }
+        if (folder.toLowerCase() === "system" && baseName.toLowerCase() === "iconset") {
+          projectAssets.iconSetUrl = url;
+          const iconImg = new Image();
+          iconImg.onload = () => {
+            projectAssets.iconSetReady = true;
+            debugLog("info", "img/system/IconSet.png の読み込みに成功しました。", {
+              path,
+              naturalWidth: iconImg.naturalWidth,
+              naturalHeight: iconImg.naturalHeight
+            });
+            render();
+          };
+          iconImg.onerror = () => {
+            projectAssets.iconSetReady = false;
+            debugLog("error", "img/system/IconSet.png の読み込みに失敗しました。", { path, fileName: file.name, type: file.type, size: file.size });
+            render();
+          };
+          iconImg.src = url;
+          projectAssets.iconSetImage = iconImg;
         }
       }
     }
