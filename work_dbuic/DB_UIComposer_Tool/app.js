@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.52";
+  const TOOL_VERSION = "0.4.54";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -13488,7 +13488,7 @@ ${choiceRuleStructComment()}
     return cur;
   }
 
-  function previewDatabaseObjectRow(row, fieldPath) {
+  function previewDatabaseObjectProp(row, fieldPath) {
     if (!row || typeof row !== "object") return null;
     const key = String(fieldPath || "name");
     if (!key || key === "self") return row;
