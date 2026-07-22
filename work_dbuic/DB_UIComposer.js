@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.59 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.60 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -66,6 +66,7 @@
  * v0.4.57では、データベース項目一覧を種類別に整理し、人が分かる日本語名で選べるよう改善しています。
  * v0.4.58では、ゲージのデータベース参照UIが『値』セクション内に見えるよう修正しています。
  * v0.4.59では、データベースのアイコン番号を実際のアイコン表示（\I[n]）へ対応し、drawText系でも描画できるよう改善しています。
+ * v0.4.60では、用語のコマンド名を配列indexで正しく取得できるよう修正し、日本語名の一覧選択に対応しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -2108,18 +2109,60 @@
     return table[index] ?? "";
   };
 
+  const databaseCommandTermIndexMap = () => ({
+    fight: 0,
+    escape: 1,
+    attack: 2,
+    guard: 3,
+    item: 4,
+    skill: 5,
+    equip: 6,
+    status: 7,
+    formation: 8,
+    save: 9,
+    gameEnd: 10,
+    options: 11,
+    weapon: 12,
+    armor: 13,
+    keyItem: 14,
+    equip2: 15,
+    optimize: 16,
+    clear: 17,
+    newGame: 18,
+    continue: 19,
+    continue_: 19,
+    toTitle: 21,
+    cancel: 22,
+    buy: 24,
+    sell: 25
+  });
+
+  const resolveDatabaseTermArrayIndex = (category, termKey, fallbackId = 0) => {
+    const key = String(termKey || "").trim();
+    const cat = String(category || "");
+    if (cat === "commands") {
+      const map = databaseCommandTermIndexMap();
+      if (Object.prototype.hasOwnProperty.call(map, key)) return map[key];
+    }
+    if (key === "") return Math.max(0, toNumber(fallbackId, 0));
+    const n = Number(key);
+    return Number.isFinite(n) ? n : -1;
+  };
+
   const databaseTermValue = (binding, keyPrefix = "") => {
     const category = String(binding?.[databaseBindingPropKey(keyPrefix, "termCategory")] || binding?.termCategory || "messages");
     const key = String(binding?.[databaseBindingPropKey(keyPrefix, "termKey")] || binding?.termKey || "currencyUnit");
     const terms = ($dataSystem && $dataSystem.terms) ? $dataSystem.terms : {};
     const table = terms[category];
     if (Array.isArray(table)) {
-      const index = key === "" ? databaseBindingIdValue(binding, keyPrefix) : toNumber(key, -1);
+      const index = resolveDatabaseTermArrayIndex(category, key, databaseBindingIdValue(binding, keyPrefix));
+      if (!Number.isFinite(index) || index < 0) return "";
       return table[index] ?? "";
     }
     if (table && typeof table === "object") {
       return table[key] ?? "";
     }
+    if (key === "currencyUnit") return String(($dataSystem && $dataSystem.currencyUnit) || "");
     return "";
   };
 
@@ -6086,7 +6129,7 @@
   });
 
   window.DB_UIComposer = {
-    version: "0.4.59",
+    version: "0.4.60",
     applyLayout,
     refreshScene,
     normalizeLayout,

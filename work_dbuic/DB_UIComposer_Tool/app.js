@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.59";
+  const TOOL_VERSION = "0.4.60";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -9119,16 +9119,172 @@ ${choiceRuleStructComment()}
     return databaseFieldOptionRows(rows);
   }
 
+  function databaseCommandTermIndexMap() {
+    // $dataSystem.terms.commands は配列。TextManager の command(id) と同じ対応。
+    return {
+      fight: 0,
+      escape: 1,
+      attack: 2,
+      guard: 3,
+      item: 4,
+      skill: 5,
+      equip: 6,
+      status: 7,
+      formation: 8,
+      save: 9,
+      gameEnd: 10,
+      options: 11,
+      weapon: 12,
+      armor: 13,
+      keyItem: 14,
+      equip2: 15,
+      optimize: 16,
+      clear: 17,
+      newGame: 18,
+      continue: 19,
+      continue_: 19,
+      toTitle: 21,
+      cancel: 22,
+      buy: 24,
+      sell: 25
+    };
+  }
+
+  function resolveDatabaseTermArrayIndex(category, termKey, fallbackId = 0) {
+    const key = String(termKey || "").trim();
+    const cat = String(category || "");
+    if (cat === "commands") {
+      const map = databaseCommandTermIndexMap();
+      if (Object.prototype.hasOwnProperty.call(map, key)) return map[key];
+      // 旧データで continue 以外の名前キーが入っていた場合も数値化を試す
+    }
+    if (key === "") return Math.max(0, Number(fallbackId) || 0);
+    const n = Number(key);
+    return Number.isFinite(n) ? n : -1;
+  }
+
   function databaseTermKeyOptions(category) {
     const c = String(category || "messages");
     if (c === "messages") {
-      return ["alwaysDash", "commandRemember", "bgmVolume", "bgsVolume", "meVolume", "seVolume", "possession", "expTotal", "expNext", "saveMessage", "loadMessage", "file", "partyName", "emerge", "preemptive", "surprise", "escapeStart", "escapeFailure", "victory", "defeat", "obtainExp", "obtainGold", "obtainItem", "levelUp", "obtainSkill", "useItem", "criticalToEnemy", "criticalToActor", "actorDamage", "actorRecovery", "actorGain", "actorLoss", "actorDrain", "actorNoDamage", "actorNoHit", "enemyDamage", "enemyRecovery", "enemyGain", "enemyLoss", "enemyDrain", "enemyNoDamage", "enemyNoHit", "evasion", "magicEvasion", "magicReflection", "counterAttack", "substitute", "buffAdd", "debuffAdd", "buffRemove", "actionFailure"].map(k => ({ value: k, label: k }));
+      return [
+        ["alwaysDash", "ダッシュをデフォルトにする"],
+        ["commandRemember", "コマンド記憶"],
+        ["touchUI", "タッチUI"],
+        ["bgmVolume", "BGM音量"],
+        ["bgsVolume", "BGS音量"],
+        ["meVolume", "ME音量"],
+        ["seVolume", "SE音量"],
+        ["possession", "持っている数"],
+        ["expTotal", "現在の経験値"],
+        ["expNext", "次のレベルまでの経験値"],
+        ["saveMessage", "セーブメッセージ"],
+        ["loadMessage", "ロードメッセージ"],
+        ["file", "ファイル"],
+        ["autosave", "オートセーブ"],
+        ["partyName", "パーティ名"],
+        ["emerge", "出現"],
+        ["preemptive", "先制攻撃"],
+        ["surprise", "不意打ち"],
+        ["escapeStart", "逃走開始"],
+        ["escapeFailure", "逃走失敗"],
+        ["victory", "勝利"],
+        ["defeat", "敗北"],
+        ["obtainExp", "経験値入手"],
+        ["obtainGold", "お金入手"],
+        ["obtainItem", "アイテム入手"],
+        ["levelUp", "レベルアップ"],
+        ["obtainSkill", "スキル習得"],
+        ["useItem", "アイテム使用"],
+        ["criticalToEnemy", "敵への会心"],
+        ["criticalToActor", "味方への会心"],
+        ["actorDamage", "味方ダメージ"],
+        ["actorRecovery", "味方回復"],
+        ["actorGain", "味方増加"],
+        ["actorLoss", "味方減少"],
+        ["actorDrain", "味方吸収"],
+        ["actorNoDamage", "味方ノーダメージ"],
+        ["actorNoHit", "味方ミス"],
+        ["enemyDamage", "敵ダメージ"],
+        ["enemyRecovery", "敵回復"],
+        ["enemyGain", "敵増加"],
+        ["enemyLoss", "敵減少"],
+        ["enemyDrain", "敵吸収"],
+        ["enemyNoDamage", "敵ノーダメージ"],
+        ["enemyNoHit", "敵ミス"],
+        ["evasion", "回避"],
+        ["magicEvasion", "魔法回避"],
+        ["magicReflection", "魔法反射"],
+        ["counterAttack", "反撃"],
+        ["substitute", "身代わり"],
+        ["buffAdd", "強化"],
+        ["debuffAdd", "弱体"],
+        ["buffRemove", "強化解除"],
+        ["actionFailure", "行動失敗"]
+      ].map(([value, label]) => ({ value, label, group: "メッセージ", detail: value }));
     }
-    if (c === "commands") return ["fight", "escape", "attack", "guard", "item", "skill", "equip", "status", "formation", "save", "gameEnd", "options", "weapon", "armor", "keyItem", "optimize", "clear", "newGame", "continue_", "toTitle", "cancel", "buy", "sell"].map(k => ({ value: k === 'continue_' ? 'continue' : k, label: k === 'continue_' ? 'continue' : k }));
-    if (c === "basic") return [0,1,2,3,4,5,6,7,8,9,10].map(i => ({ value: String(i), label: `basic[${i}]` }));
-    if (c === "params") return [0,1,2,3,4,5,6,7].map(i => ({ value: String(i), label: `params[${i}]` }));
-    return [{ value: "currencyUnit", label: "currencyUnit" }];
+    if (c === "commands") {
+      return [
+        [0, "戦う", "fight"],
+        [1, "逃げる", "escape"],
+        [2, "攻撃", "attack"],
+        [3, "防御", "guard"],
+        [4, "アイテム", "item"],
+        [5, "スキル", "skill"],
+        [6, "装備", "equip"],
+        [7, "ステータス", "status"],
+        [8, "並び替え", "formation"],
+        [9, "セーブ", "save"],
+        [10, "ゲーム終了", "gameEnd"],
+        [11, "オプション", "options"],
+        [12, "武器", "weapon"],
+        [13, "防具", "armor"],
+        [14, "大事なもの", "keyItem"],
+        [15, "装備変更", "equip2"],
+        [16, "最強装備", "optimize"],
+        [17, "全て外す", "clear"],
+        [18, "ニューゲーム", "newGame"],
+        [19, "コンティニュー", "continue"],
+        [21, "タイトルへ", "toTitle"],
+        [22, "キャンセル", "cancel"],
+        [24, "購入する", "buy"],
+        [25, "売却する", "sell"]
+      ].map(([index, label, detail]) => ({ value: String(index), label, group: "コマンド名", detail }));
+    }
+    if (c === "basic") {
+      return [
+        [0, "レベル"], [1, "レベル(略)"], [2, "HP"], [3, "HP(略)"], [4, "MP"], [5, "MP(略)"],
+        [6, "TP"], [7, "TP(略)"], [8, "経験値"], [9, "経験値(略)"]
+      ].map(([index, label]) => ({ value: String(index), label, group: "基本ステータス", detail: `basic[${index}]` }));
+    }
+    if (c === "params") {
+      return [
+        [0, "最大HP"], [1, "最大MP"], [2, "攻撃力"], [3, "防御力"],
+        [4, "魔法力"], [5, "魔法防御"], [6, "敏捷性"], [7, "運"]
+      ].map(([index, label]) => ({ value: String(index), label, group: "能力値名", detail: `params[${index}]` }));
+    }
+    return [{ value: "currencyUnit", label: "通貨単位", group: "その他", detail: "currencyUnit" }];
   }
+
+  function resolveDatabaseTermValue(terms, category, termKey, fallbackId = 0) {
+    const cat = String(category || "messages");
+    const key = String(termKey || "").trim();
+    const table = terms?.[cat];
+    if (Array.isArray(table)) {
+      const index = resolveDatabaseTermArrayIndex(cat, key, fallbackId);
+      if (!Number.isFinite(index) || index < 0) return "";
+      return table[index] ?? "";
+    }
+    if (table && typeof table === "object") {
+      if (Object.prototype.hasOwnProperty.call(table, key)) return table[key] ?? "";
+      // コマンド名を誤って messages 側キー扱いにしていた旧データ向け救済は不要
+      return table[key] ?? "";
+    }
+    if (key === "currencyUnit" || cat === "currencyUnit") {
+      return String(projectAssets.system?.currencyUnit || "G");
+    }
+    return "";
+  }
+
 
   function renderDatabaseBindingSection(item, options = {}) {
     const db = ensureDatabaseBinding(item);
@@ -9235,14 +9391,34 @@ ${choiceRuleStructComment()}
         { value: "messages", label: "メッセージ" },
         { value: "commands", label: "コマンド名" },
         { value: "params", label: "能力値名" },
-        { value: "basic", label: "基本語" }
+        { value: "basic", label: "基本ステータス" }
       ], value => {
         db[termCategoryKey] = value;
         const opts = databaseTermKeyOptions(value);
         if (opts.length) db[termKeyKey] = opts[0].value;
       });
       const termOptions = databaseTermKeyOptions(db[termCategoryKey] || "messages");
-      addSelect(`${labelPrefix}用語キー`, db[termKeyKey] || termOptions[0]?.value || "", termOptions, value => { db[termKeyKey] = value; });
+      // 旧データで commands が fight 等の名前キーのまま残っている場合は配列indexへ正規化
+      if (String(db[termCategoryKey] || "") === "commands") {
+        const idx = resolveDatabaseTermArrayIndex("commands", db[termKeyKey], 0);
+        if (idx >= 0) db[termKeyKey] = String(idx);
+      }
+      const currentTerm = String(db[termKeyKey] || termOptions[0]?.value || "");
+      const termLabel = termOptions.find(opt => String(opt.value) === currentTerm);
+      addReadonly(`${labelPrefix}選択中の用語`, termLabel ? `${termLabel.label}` : (currentTerm || "未選択"));
+      addButtonControl(`${labelPrefix}用語を一覧から選択`, () => {
+        openDatabaseFieldPicker({
+          title: `${labelPrefix}用語を選択`.trim() || "用語を選択",
+          subtitle: `${db[termCategoryKey] || "messages"}（${termOptions.length}件）`,
+          options: termOptions,
+          currentValue: currentTerm,
+          onSelect: (value) => {
+            runStateMutation(`${labelPrefix}用語選択`, () => {
+              db[termKeyKey] = String(value || "");
+            });
+          }
+        });
+      });
     } else if (db[sourceKey] !== "gold") {
       const optionsList = syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
       const kindLabel = db[sourceKey] === "databaseObject" ? (db[objectKey] || "item") : (db[sourceKey] || "actor");
@@ -13811,14 +13987,7 @@ ${choiceRuleStructComment()}
       const category = String(binding?.[databaseBindingPropKey(prefix, "termCategory")] || binding?.termCategory || "messages");
       const termKey = String(binding?.[databaseBindingPropKey(prefix, "termKey")] || binding?.termKey || "");
       const terms = projectAssets.system?.terms || {};
-      const table = terms[category];
-      if (Array.isArray(table)) {
-        const index = termKey === "" ? sourceId : Number(termKey);
-        return Number.isFinite(index) ? (table[index] ?? "") : "";
-      }
-      if (table && typeof table === "object") return table[termKey] ?? "";
-      if (category === "basic" || !category) return String(projectAssets.system?.currencyUnit || "G");
-      return "";
+      return resolveDatabaseTermValue(terms, category, termKey, sourceId);
     }
 
     if (sourceType === "actor") {
