@@ -41,11 +41,12 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.46";
+  const TOOL_VERSION = "0.4.47";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
   const PROJECT_HANDLE_KEY = "projectDirectoryHandle";
+  const SAMPLE_SCENE_CUSTOM_KEY = "DB_UIComposer.sampleSceneCustom.v1";
   const CATALOG_HANDLE_KEY = "commandCatalogFileHandle";
   const CATALOG_SAVE_MODE_KEY = "DB_UIComposer.catalogSaveMode";
   const CATALOG_SAVE_MODE_PROJECT = "projectRelative";
@@ -133,6 +134,7 @@
       groups: [],
       scenes: [],
       activeSceneId: "",
+      sceneSampleLinks: {},
       compositePresetLibraries: [],
       componentTemplates: [],
       windows: [
@@ -1826,6 +1828,11 @@
     return sceneById(selected.sceneId);
   }
 
+  function ensureSceneSampleLinks() {
+    if (!state.sceneSampleLinks || typeof state.sceneSampleLinks !== "object") state.sceneSampleLinks = {};
+    return state.sceneSampleLinks;
+  }
+
   function layoutForExport() {
     const data = JSON.parse(JSON.stringify({
       layoutId: state.layoutId,
@@ -1835,6 +1842,7 @@
       groups: normalizeGroupsForExport(),
       scenes: normalizeScenesForExport(),
       activeSceneId: normalizeSceneId(state.activeSceneId || ""),
+      sceneSampleLinks: ensureSceneSampleLinks(),
       compositePresetLibraries: ensureCompositePresetLibraries(),
       componentTemplates: ensureComponentTemplates(),
       windows: state.windows
@@ -3510,6 +3518,7 @@
         entry.groupIds = (entry.groupIds || []).filter(groupId => !targetGroupIds.has(normalizeGroupId(groupId || "")));
       }
       state.scenes = ensureScenes().filter(entry => entry.id !== id);
+      delete ensureSceneSampleLinks()[id];
       if (state.activeSceneId === id) state.activeSceneId = state.scenes[0]?.id || "";
       if (selected?.kind === "scene" && selected.sceneId === id) selected = state.activeSceneId ? { kind: "scene", sceneId: state.activeSceneId } : null;
       if (selected?.kind === "group" && targetGroupIds.has(normalizeGroupId(selected.groupId || ""))) selected = null;
@@ -4258,7 +4267,7 @@
     return true;
   }
 
-  function importSceneTemplate(payload) {
+  function importSceneTemplate(payload, options = {}) {
     const sourceScene = payload?.scene || null;
     if (!sourceScene) return false;
     let newSceneId = "";
@@ -4293,6 +4302,14 @@
         includeUngrouped: sourceScene.includeUngrouped === true
       };
       scenes.push(scene);
+      if (options.sampleTemplateId) {
+        const links = ensureSceneSampleLinks();
+        links[scene.id] = {
+          sampleId: String(options.sampleTemplateId || ""),
+          category: String(options.sampleCategory || "advanced"),
+          name: String(options.sampleName || scene.name || scene.id)
+        };
+      }
       state.activeSceneId = scene.id;
       selected = { kind: "scene", sceneId: scene.id };
       pendingObjectListReveal = true;
@@ -4305,7 +4322,13 @@
     const template = entry || chooseComponentTemplate();
     if (!template) return false;
     const data = cloneForHistory(template.data || {});
-    if (template.kind === "scene") return importSceneTemplate(data);
+    if (template.kind === "scene") {
+      return importSceneTemplate(data, {
+        sampleTemplateId: template.sampleId || template.id || "",
+        sampleCategory: template.category || "advanced",
+        sampleName: template.name || ""
+      });
+    }
     if (template.kind === "group") return importGroupTemplate(data, target);
     if (template.kind === "window") return importWindowTemplate(data.window, target);
     if (template.kind === "item") return importItemTemplate(data.item, target);
@@ -4350,194 +4373,432 @@
     }, extra || {});
   }
 
+  function sampleImagePlaceholderItem(id, x, y, width, height, note = "", extra = {}) {
+    return Object.assign({
+      type: "image",
+      id,
+      x,
+      y,
+      width,
+      height,
+      folder: "pictures",
+      fileName: "",
+      opacity: 255,
+      mode: "stretch",
+      visible: true,
+      zOrder: 0,
+      help: note || "ここに画像を設定してください。"
+    }, extra || {});
+  }
+
   function createSampleSceneTemplates() {
     return [
       {
-        id: "sampleLayeringBasics",
+        id: "basicSceneConcepts",
         kind: "scene",
-        name: "01_Layering_Basics：背景を後ろに置く標準構成",
+        category: "basic",
+        name: "基礎編 01：シーン/グループ/ウィンドウの概念",
+        description: "シーン階層の役割を確認する学習用サンプルです。",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Layering_Basics", name: "Layering_Basics", groupIds: ["guide_group", "content_group", "bg_group"], includeUngrouped: false },
+          scene: { id: "Basic_01_SceneConcepts", name: "Basic_01_SceneConcepts", groupIds: ["tutorial_scene", "tutorial_groups", "tutorial_windows"], includeUngrouped: false },
           groups: [
-            { id: "guide_group", name: "前面ガイド", visible: true, locked: false },
-            { id: "content_group", name: "本文", visible: true, locked: false },
-            { id: "bg_group", name: "背景", visible: true, locked: false }
+            { id: "tutorial_scene", name: "1 シーン説明", visible: true, locked: false },
+            { id: "tutorial_groups", name: "2 グループ説明", visible: true, locked: false },
+            { id: "tutorial_windows", name: "3 ウィンドウ説明", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Guide_Window", "guide_group", 80, 488, 644, 82, [
-              sampleTextItem("Guide_Text", 14, 10, "このウィンドウは説明用（前面）です。完成時は非表示にしてください。", 15, 604, { color: "#ffe0a8", zOrder: 100 })
-            ], { opacity: 140, zOrder: 240 }),
-            sampleWindowBase("Content_Window", "content_group", 92, 120, 620, 340, [
-              sampleTextItem("Content_Title", 22, 14, "本文ウィンドウ（zOrder: 0）", 28, 460, { color: "#ffffff", zOrder: 20 }),
-              sampleTextItem("Content_Desc", 22, 64, "背景は低いzOrder、本文は中間、ガイドは高いzOrderにすると\n前後関係の混乱を防げます。", 17, 560, { color: "#d5e2f5", zOrder: 30 })
-            ], { zOrder: 0 }),
-            sampleWindowBase("Background_Window", "bg_group", 24, 20, 768, 560, [
-              sampleTextItem("Background_Label", 24, 20, "背景ウィンドウ（最背面）\n常に後ろへ置く基礎見本", 22, 520, { color: "#bcd0ea", zOrder: -10 })
-            ], { opacity: 160, backgroundType: "dim", zOrder: -300 })
-          ]
-        }
-      },
-      {
-        id: "sampleTextLogBasics",
-        kind: "scene",
-        name: "02_Text_Log_Basics：text/logカテゴリの基本",
-        savedAt: "sample",
-        version: TOOL_VERSION,
-        data: {
-          scene: { id: "Text_Log_Basics", name: "Text_Log_Basics", groupIds: ["textlog_group"], includeUngrouped: false },
-          groups: [{ id: "textlog_group", name: "Text/Log", visible: true, locked: false }],
-          windows: [
-            sampleWindowBase("Text_Log_Window", "textlog_group", 70, 56, 680, 500, [
-              sampleTextItem("Text_Title", 20, 14, "textカテゴリの見本（複数行・揃え・色）", 27, 560, { color: "#ffffff", zOrder: 10 }),
-              sampleTextItem("Text_MultiLine", 20, 64, "1行目：テキスト基本\n2行目：インライン編集の改行確認\n3行目：outline/color/fontSize調整対象", 18, 620, { color: "#dce8ff", zOrder: 20 }),
-              { type: "log", id: "Log_Preview", x: 20, y: 190, width: 620, height: 220, fontSize: 18, lineHeight: 30, color: "#ffffff", paddingX: 8, paddingY: 8, maxLines: 5, displayFrames: 180, fadeFrames: 30, moveFrames: 20, sampleText: "ログを追加しました。\nアイテムを入手しました。\nHPが10回復しました。\n目的地を更新しました。", zOrder: 30, visible: true },
-              sampleTextItem("Log_Guide", 20, 430, "logカテゴリは AddItemLogText コマンド連携向けです。", 15, 620, { color: "#b8d0f0", zOrder: 40 })
+            sampleWindowBase("Tutorial_Title_Window", "tutorial_scene", 34, 28, 748, 84, [
+              sampleTextItem("Tutorial_Title", 20, 12, "DB_UIComposer 基礎編 01", 28, 420, { color: "#ffffff" }),
+              sampleTextItem("Tutorial_Sub", 22, 48, "シーン → グループ → ウィンドウの役割を確認します。", 16, 690, { color: "#cfe0ff" })
+            ], { opacity: 210 }),
+            sampleWindowBase("Scene_Explain_Window", "tutorial_scene", 46, 132, 704, 118, [
+              sampleTextItem("Scene_H", 18, 12, "1. シーン", 24, 180, { color: "#ffe7a0" }),
+              sampleTextItem("Scene_Body", 22, 48, "シーンは1画面分の構成です。ステータス画面やHUD画面など、用途ごとに保存・読込できます。", 16, 650, { color: "#ffffff" })
+            ]),
+            sampleWindowBase("Group_Explain_Window", "tutorial_groups", 46, 270, 704, 126, [
+              sampleTextItem("Group_H", 18, 12, "2. グループ", 24, 180, { color: "#b8ffce" }),
+              sampleTextItem("Group_Body", 22, 48, "グループは複数ウィンドウをまとめる単位です。表示/非表示やロックをまとめて切り替えられます。", 16, 650, { color: "#ffffff" })
+            ]),
+            sampleWindowBase("Window_Explain_Window", "tutorial_windows", 46, 416, 704, 126, [
+              sampleTextItem("Window_H", 18, 12, "3. ウィンドウ", 24, 180, { color: "#b8d4ff" }),
+              sampleTextItem("Window_Body", 22, 48, "ウィンドウはパーツを配置する枠です。中へテキスト・画像・ゲージ・ログ・ボタンを置きます。", 16, 650, { color: "#ffffff" })
             ])
           ]
         }
       },
       {
-        id: "sampleGaugeDirections",
+        id: "basicPartsGuide",
         kind: "scene",
-        name: "03_Gauge_Directions：横/縦/円ゲージ比較",
+        category: "basic",
+        name: "基礎編 02：主要パーツの用途",
+        description: "テキスト/画像/ゲージ/ログ/ボタンの用途を確認する基礎サンプルです。",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Gauge_Directions", name: "Gauge_Directions", groupIds: ["gauge_group"], includeUngrouped: false },
-          groups: [{ id: "gauge_group", name: "Gauge", visible: true, locked: false }],
+          scene: { id: "Basic_02_PartsGuide", name: "Basic_02_PartsGuide", groupIds: ["tutorial_parts"], includeUngrouped: false },
+          groups: [{ id: "tutorial_parts", name: "パーツ説明", visible: true, locked: false }],
           windows: [
-            sampleWindowBase("Gauge_Window", "gauge_group", 70, 54, 680, 500, [
-              sampleTextItem("Gauge_Title", 20, 12, "gaugeカテゴリ：方向・形状・開始角度", 27, 520, { color: "#ffffff", zOrder: 10 }),
-              sampleGaugeItem("Gauge_H_LR", 30, 86, 260, 18, 72, 100, "", "#66ccff", "#d0f1ff", "horizontal", "leftToRight"),
-              sampleGaugeItem("Gauge_H_RL", 30, 122, 260, 18, 45, 100, "", "#ff8e66", "#ffd6c4", "horizontal", "rightToLeft"),
-              sampleGaugeItem("Gauge_V_BT", 352, 86, 30, 160, 64, 100, "", "#8aff7d", "#d4ffd0", "vertical", "bottomToTop"),
-              sampleGaugeItem("Gauge_V_TB", 406, 86, 30, 160, 38, 100, "", "#c98aff", "#ecd6ff", "vertical", "topToBottom"),
-              sampleGaugeItem("Gauge_Circle_CW", 70, 288, 92, 92, 78, 100, "", "#ffd25a", "#fff0a8", "circle", "clockwise", 0),
-              sampleGaugeItem("Gauge_Circle_CCW", 220, 288, 92, 92, 40, 100, "", "#ff7ab8", "#ffd0e6", "circle", "counterClockwise", 0),
-              sampleTextItem("Gauge_Guide", 20, 412, "startAngle=0 が標準。必要に応じて direction と組み合わせて調整します。", 15, 620, { color: "#cfe0ff", zOrder: 50 })
+            sampleWindowBase("Parts_Explain_Window", "tutorial_parts", 38, 34, 742, 514, [
+              sampleTextItem("Parts_Title", 20, 12, "パーツの基本", 28, 300, { color: "#ffffff" }),
+              sampleTextItem("Text_Label", 30, 70, "テキスト：名前、説明、数値表示に使用。", 16, 640, { color: "#ffffff" }),
+              sampleTextItem("Image_Label", 30, 114, "画像：立ち絵や背景に使用。下に差し替えスロットを用意。", 16, 640, { color: "#ffffff" }),
+              sampleImagePlaceholderItem("Image_Slot_Basic", 52, 150, 180, 120, "任意画像を設定してください"),
+              sampleTextItem("Image_Slot_Note", 248, 188, "↑ 画像パーツの差し替えスロット", 15, 220, { color: "#cfe0ff" }),
+              sampleTextItem("Gauge_Label", 30, 292, "ゲージ：横/縦/円に対応。", 16, 640, { color: "#ffffff" }),
+              sampleGaugeItem("Tutorial_HP_Gauge", 54, 328, 260, 18, 80, 100, "", "#ff6060", "#ffb0b0", "horizontal", "leftToRight"),
+              sampleGaugeItem("Tutorial_V_Gauge", 364, 320, 28, 86, 55, 100, "", "#66ccff", "#d0f1ff", "vertical", "bottomToTop"),
+              sampleGaugeItem("Tutorial_C_Gauge", 448, 320, 86, 86, 45, 100, "", "#ffd25a", "#fff0a8", "circle", "clockwise"),
+              { type: "log", id: "Tutorial_Log", x: 54, y: 430, width: 520, height: 64, fontSize: 16, lineHeight: 24, color: "#ffffff", paddingX: 8, paddingY: 8, maxLines: 2, lineVisibleFrames: 180, fadeFrames: 30, moveFrames: 20, sampleText: "ログパーツです。\nゲーム内で文章を追加できます。", zOrder: 0, visible: true }
             ])
           ]
         }
       },
       {
-        id: "sampleImageCompositeBasics",
+        id: "basicSaveReuse",
         kind: "scene",
-        name: "04_Image_Composite_Basics：image/compositeImage基礎",
+        category: "basic",
+        name: "基礎編 03：保存/読込と再利用",
+        description: "サンプル編集後の保存や、部品としての再利用手順を確認できます。",
         savedAt: "sample",
         version: TOOL_VERSION,
         data: {
-          scene: { id: "Image_Composite_Basics", name: "Image_Composite_Basics", groupIds: ["image_group"], includeUngrouped: false },
-          groups: [{ id: "image_group", name: "Image/Composite", visible: true, locked: false }],
-          windows: [
-            sampleWindowBase("Image_Composite_Window", "image_group", 72, 56, 676, 500, [
-              sampleTextItem("Image_Title", 20, 14, "image / compositeImage カテゴリ", 27, 620, { color: "#ffffff", zOrder: 10 }),
-              { type: "image", id: "Single_Image", x: 24, y: 78, width: 180, height: 120, folder: "pictures", fileName: "", scaleX: 1, scaleY: 1, scaleXPercent: 100, scaleYPercent: 100, opacity: 255, zOrder: 20, visible: true },
-              sampleTextItem("Single_Image_Guide", 24, 206, "image：単体画像。画像選択後に\n原寸ボタンで自然サイズへ戻せます。", 14, 260, { color: "#cfe0ff", zOrder: 21 }),
-              {
-                type: "compositeImage",
-                id: "Composite_Image",
-                x: 330,
-                y: 78,
-                width: 220,
-                height: 160,
-                scaleX: 1,
-                scaleY: 1,
-                scaleXPercent: 100,
-                scaleYPercent: 100,
-                opacity: 255,
-                selectedLayerIndex: 0,
-                selectedPresetId: "",
-                layers: [
-                  { id: "layer1", name: "レイヤー1", layerKind: "compositeImageLayer", visible: true, folder: "pictures", fileName: "", previewSrc: "", previewName: "", previewNaturalWidth: 0, previewNaturalHeight: 0, x: 0, y: 0, width: 220, height: 160, opacity: 255, priority: 1, blendMode: "normal" }
-                ],
-                zOrder: 30,
-                visible: true
-              },
-              sampleTextItem("Composite_Guide", 330, 250, "compositeImage：複数レイヤーを重ねるカテゴリ。\nPSD/名前ID連携のベースとして使えます。", 14, 320, { color: "#cfe0ff", zOrder: 31 })
-            ])
-          ]
-        }
-      },
-      {
-        id: "sampleButtonChoiceBasics",
-        kind: "scene",
-        name: "05_Button_Choice_Basics：button/choiceList/imageChoiceList",
-        savedAt: "sample",
-        version: TOOL_VERSION,
-        data: {
-          scene: { id: "Button_Choice_Basics", name: "Button_Choice_Basics", groupIds: ["menu_group"], includeUngrouped: false },
+          scene: { id: "Basic_03_SaveReuse", name: "Basic_03_SaveReuse", groupIds: ["tutorial_reuse", "tutorial_save_targets"], includeUngrouped: false },
           groups: [
-            { id: "menu_group", name: "Menu Components", visible: true, locked: false }
+            { id: "tutorial_reuse", name: "保存読込の説明", visible: true, locked: false },
+            { id: "tutorial_save_targets", name: "保存して試す部品", visible: true, locked: false }
           ],
           windows: [
-            sampleWindowBase("Button_Choice_Window", "menu_group", 70, 56, 680, 500, [
-              sampleTextItem("Menu_Title", 20, 14, "button / choiceList / imageChoiceList", 27, 620, { color: "#ffffff", zOrder: 10 }),
-              { type: "button", id: "Normal_Button", x: 28, y: 72, width: 180, height: 42, text: "通常ボタン", buttonVisualMode: "normal", zOrder: 20, visible: true },
-              { type: "button", id: "Image_Button", x: 232, y: 72, width: 200, height: 42, text: "画像ボタン（未設定）", buttonVisualMode: "image", zOrder: 21, visible: true },
-              {
-                type: "choiceList",
-                id: "Choice_List",
-                x: 28,
-                y: 146,
-                choiceMode: "tool",
-                width: 220,
-                rowHeight: 32,
-                maxVisibleRows: 5,
-                choices: ["探索", "休憩", "戻る"],
-                choiceRules: [
-                  { text: "探索", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" },
-                  { text: "休憩", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" },
-                  { text: "戻る", conditionType: "always", trueState: "enabled", falseState: "hidden", switchId: 0, variableId: 0, compareValue: 0, script: "" }
-                ],
-                autoResizeWindow: true,
-                normalBackColor: "rgba(255,255,255,.10)",
-                hoverBackColor: "rgba(255,255,255,.22)",
-                selectedBackColor: "rgba(98,169,255,.35)",
-                disabledBackColor: "rgba(0,0,0,.28)",
-                disabledTextColor: "rgba(180,180,180,.85)",
-                borderColor: "rgba(255,255,255,.35)",
-                textColor: "",
-                fontSize: 18,
-                align: "center",
-                closeWindowOnSelect: false,
-                choiceEnabled: [true, true, true],
-                disabledIndexes: "",
-                resultVariableId: 0,
-                commonEventId: 0,
-                script: "",
-                zOrder: 30,
-                visible: true
-              },
-              {
-                type: "imageChoiceList",
-                id: "Image_Choice_List",
-                x: 320,
-                y: 152,
-                width: 180,
-                height: 110,
-                selectedOptionIndex: 0,
-                closeWindowOnSelect: false,
-                options: [createDefaultImageChoiceOption(0), createDefaultImageChoiceOption(1)],
-                zOrder: 31,
-                visible: true
-              },
-              sampleTextItem("Menu_Guide", 20, 410, "buttonは単発操作、choiceListは文字選択、imageChoiceListは画像選択向け。", 15, 620, { color: "#cfe0ff", zOrder: 60 })
+            sampleWindowBase("Reuse_Guide_Window", "tutorial_reuse", 38, 40, 742, 206, [
+              sampleTextItem("Reuse_Title", 20, 12, "保存・読込チュートリアル", 28, 380, { color: "#ffffff" }),
+              sampleTextItem("Reuse_1", 24, 62, "1. このサンプルを読み込んで編集", 16, 680, { color: "#ffffff" }),
+              sampleTextItem("Reuse_2", 24, 96, "2. サンプル管理画面で『現在シーンを保存』", 16, 680, { color: "#ffffff" }),
+              sampleTextItem("Reuse_3", 24, 130, "3. 壊れたら同画面の『初期化』で復元", 16, 680, { color: "#ffffff" })
+            ]),
+            sampleWindowBase("Reusable_Status_Block", "tutorial_save_targets", 76, 286, 304, 170, [
+              sampleTextItem("Reusable_Name", 18, 14, "再利用用ステータス部品", 20, 230, { color: "#ffffff" }),
+              sampleTextItem("Reusable_Hp_Label", 20, 62, "HP", 16, 40, { color: "#ffc0c0" }),
+              sampleGaugeItem("Reusable_Hp", 64, 66, 190, 14, 62, 100, "", "#ff6060", "#ffb0b0", "horizontal", "leftToRight")
+            ], { opacity: 220 }),
+            sampleWindowBase("Reusable_Image_Block", "tutorial_save_targets", 428, 286, 256, 170, [
+              sampleImagePlaceholderItem("Reusable_Image_Slot", 20, 24, 100, 100, "好みのアイコン/立ち絵を設定"),
+              sampleTextItem("Reusable_Image_Note", 132, 54, "画像差し替え用\nスロット", 14, 96, { align: "center", color: "#cfe0ff" })
+            ], { opacity: 220 })
+          ]
+        }
+      },
+      {
+        id: "advStatusMenu",
+        kind: "scene",
+        category: "advanced",
+        name: "応用編 01：ステータスメニュー構成",
+        description: "実ゲームのステータス画面を想定した改変用サンプルです。",
+        savedAt: "sample",
+        version: TOOL_VERSION,
+        data: {
+          scene: { id: "Adv_StatusMenu", name: "Adv_StatusMenu", groupIds: ["status_root", "actor_info", "gauge_group", "param_group"], includeUngrouped: false },
+          groups: [
+            { id: "status_root", name: "背景・立ち絵枠", visible: true, locked: false },
+            { id: "actor_info", name: "名前・職業ブロック", visible: true, locked: false },
+            { id: "gauge_group", name: "HP/MP/TPゲージ", visible: true, locked: false },
+            { id: "param_group", name: "能力値リスト", visible: true, locked: false }
+          ],
+          windows: [
+            sampleWindowBase("Status_Background_Window", "status_root", 40, 36, 736, 520, [
+              sampleTextItem("Status_Title", 22, 14, "STATUS", 30, 240, { color: "#ffffff" }),
+              sampleImagePlaceholderItem("Status_BG_Slot", 22, 72, 690, 430, "背景画像を設定してください"),
+              sampleTextItem("Status_BG_Note", 26, 80, "背景画像スロット", 14, 180, { color: "#a8bad8" })
+            ], { opacity: 210 }),
+            sampleWindowBase("Actor_Stand_Window", "status_root", 62, 118, 220, 360, [
+              sampleImagePlaceholderItem("Actor_Stand_Slot", 12, 12, 190, 300, "立ち絵画像を設定してください"),
+              sampleTextItem("Stand_Note", 18, 320, "立ち絵差し替え用", 14, 180, { align: "center", color: "#9fb0c8" })
+            ]),
+            sampleWindowBase("Actor_Info_Window", "actor_info", 310, 108, 420, 116, [
+              sampleTextItem("Actor_Name", 22, 12, "主人公", 28, 180, { color: "#ffffff" }),
+              sampleTextItem("Actor_Level", 250, 18, "Lv 12", 22, 100, { color: "#ffffff" }),
+              sampleTextItem("Actor_Class", 24, 58, "クラス：見習い冒険者", 18, 260, { color: "#cfe0ff" })
+            ]),
+            sampleWindowBase("Gauge_Window", "gauge_group", 310, 242, 420, 160, [
+              sampleTextItem("Hp_Label", 20, 16, "HP", 18, 50, { color: "#ffc0c0" }),
+              sampleGaugeItem("Hp_Gauge", 70, 20, 250, 16, 75, 100, "", "#ff5a5a", "#ffb0b0"),
+              sampleTextItem("Mp_Label", 20, 52, "MP", 18, 50, { color: "#b8d4ff" }),
+              sampleGaugeItem("Mp_Gauge", 70, 56, 250, 16, 42, 80, "", "#4b8bff", "#b8d4ff"),
+              sampleTextItem("Tp_Label", 338, 18, "TP", 16, 50, { align: "center", color: "#ffe7a0" }),
+              sampleGaugeItem("Tp_Circle", 332, 42, 58, 58, 35, 100, "", "#ffd15a", "#fff0a8", "circle", "clockwise", 0)
+            ]),
+            sampleWindowBase("Parameter_Window", "param_group", 310, 420, 420, 92, [
+              sampleTextItem("Param_ATK", 20, 10, "攻撃  24", 18, 120),
+              sampleTextItem("Param_DEF", 160, 10, "防御  18", 18, 120),
+              sampleTextItem("Param_MAT", 20, 42, "魔法  31", 18, 120),
+              sampleTextItem("Param_AGI", 160, 42, "敏捷  22", 18, 120)
             ])
+          ]
+        }
+      },
+      {
+        id: "advBattleHud",
+        kind: "scene",
+        category: "advanced",
+        name: "応用編 02：戦闘HUD構成",
+        description: "戦闘中UI（HP/MPや敵情報表示）を想定した改変用サンプルです。",
+        savedAt: "sample",
+        version: TOOL_VERSION,
+        data: {
+          scene: { id: "Adv_BattleHud", name: "Adv_BattleHud", groupIds: ["hud_player", "hud_enemy", "hud_fx"], includeUngrouped: false },
+          groups: [
+            { id: "hud_player", name: "プレイヤーHUD", visible: true, locked: false },
+            { id: "hud_enemy", name: "敵表示", visible: true, locked: false },
+            { id: "hud_fx", name: "演出ラベル", visible: true, locked: false }
+          ],
+          windows: [
+            sampleWindowBase("PlayerHud_Window", "hud_player", 24, 468, 430, 132, [
+              sampleImagePlaceholderItem("PlayerFace_Slot", 12, 12, 96, 96, "顔グラ差し替え"),
+              sampleTextItem("Player_Name", 124, 14, "主人公", 22, 180, { color: "#ffffff" }),
+              sampleGaugeItem("Battle_HP", 124, 50, 250, 14, 78, 100, "", "#ff5a5a", "#ffb0b0"),
+              sampleGaugeItem("Battle_MP", 124, 76, 250, 14, 44, 100, "", "#4b8bff", "#b8d4ff")
+            ], { opacity: 215 }),
+            sampleWindowBase("EnemyHud_Window", "hud_enemy", 504, 32, 288, 180, [
+              sampleImagePlaceholderItem("EnemyPortrait_Slot", 20, 18, 112, 112, "敵画像差し替え"),
+              sampleTextItem("Enemy_Name", 146, 26, "Enemy", 20, 120, { color: "#ffffff" }),
+              sampleGaugeItem("Enemy_HP", 146, 62, 118, 12, 55, 100, "", "#ff6a6a", "#ffc0c0")
+            ]),
+            sampleWindowBase("BattleFx_Window", "hud_fx", 266, 24, 250, 56, [
+              sampleTextItem("Fx_Label", 16, 12, "CRITICAL!", 30, 220, { align: "center", color: "#ffe17d" })
+            ], { opacity: 150 })
+          ]
+        }
+      },
+      {
+        id: "advDialogueChoice",
+        kind: "scene",
+        category: "advanced",
+        name: "応用編 03：会話 + 選択肢UI",
+        description: "会話ウィンドウ・立ち絵・選択肢を組み合わせた実戦サンプルです。",
+        savedAt: "sample",
+        version: TOOL_VERSION,
+        data: {
+          scene: { id: "Adv_DialogueChoice", name: "Adv_DialogueChoice", groupIds: ["dialogue_bg", "dialogue_message", "dialogue_choices"], includeUngrouped: false },
+          groups: [
+            { id: "dialogue_bg", name: "背景・立ち絵", visible: true, locked: false },
+            { id: "dialogue_message", name: "会話ウィンドウ", visible: true, locked: false },
+            { id: "dialogue_choices", name: "選択肢", visible: true, locked: false }
+          ],
+          windows: [
+            sampleWindowBase("Dialogue_Background_Window", "dialogue_bg", 22, 20, 772, 372, [
+              sampleImagePlaceholderItem("Dialogue_BG_Slot", 12, 12, 744, 344, "背景画像を設定"),
+              sampleImagePlaceholderItem("Dialogue_Stand_Slot", 490, 32, 250, 314, "立ち絵を設定")
+            ], { opacity: 200 }),
+            sampleWindowBase("Dialogue_Message_Window", "dialogue_message", 30, 404, 760, 152, [
+              sampleTextItem("Speaker_Name", 18, 12, "案内役", 22, 180, { color: "#ffe7a0" }),
+              sampleTextItem("Message_Line", 20, 54, "ここに会話文を表示します。改行して複数行にもできます。", 18, 700, { color: "#ffffff" })
+            ]),
+            sampleWindowBase("Dialogue_Choice_Window", "dialogue_choices", 548, 250, 230, 132, [
+              { type: "choiceList", id: "Dialogue_Choices", x: 16, y: 16, width: 190, lineHeight: 30, choices: ["はい", "いいえ", "あとで"], zOrder: 0, visible: true }
+            ], { opacity: 218 })
           ]
         }
       }
     ];
   }
 
+  function normalizeSampleCategory(category) {
+    const value = String(category || "advanced").toLowerCase();
+    if (value === "basic") return "basic";
+    if (value === "advanced") return "advanced";
+    return "custom";
+  }
+
+  function sampleCategoryLabel(category) {
+    const value = normalizeSampleCategory(category);
+    if (value === "basic") return "基礎編";
+    if (value === "advanced") return "応用編";
+    return "カスタム";
+  }
+
+  function sampleCategoryOrder(category) {
+    const value = normalizeSampleCategory(category);
+    if (value === "basic") return 1;
+    if (value === "advanced") return 2;
+    return 3;
+  }
+
+  function normalizeSampleSceneTemplateEntry(entry, fallbackCategory = "advanced") {
+    const base = normalizeComponentTemplateEntry(entry, "scene");
+    return Object.assign(base, {
+      sampleId: safeId(entry?.sampleId || base.id || "sampleScene", "sampleScene"),
+      category: normalizeSampleCategory(entry?.category || fallbackCategory),
+      description: String(entry?.description || ""),
+      source: String(entry?.source || "builtin"),
+      backupAvailable: entry?.backupAvailable === true,
+      isCustom: entry?.isCustom === true
+    });
+  }
+
+  function builtinSampleSceneTemplates() {
+    return createSampleSceneTemplates().map(entry => normalizeSampleSceneTemplateEntry(Object.assign({}, entry, {
+      source: "builtin",
+      backupAvailable: false,
+      isCustom: false
+    }), entry.category || "advanced"));
+  }
+
+  function loadCustomSampleSceneTemplates() {
+    try {
+      const raw = localStorage.getItem(SAMPLE_SCENE_CUSTOM_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(entry => normalizeSampleSceneTemplateEntry(Object.assign({}, entry, {
+        source: "custom",
+        isCustom: true
+      }), entry?.category || "custom"));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveCustomSampleSceneTemplates(list) {
+    try {
+      localStorage.setItem(SAMPLE_SCENE_CUSTOM_KEY, JSON.stringify(Array.isArray(list) ? list : []));
+      return true;
+    } catch (_) {
+      showToast("サンプル保存に失敗しました（ブラウザ保存領域）");
+      return false;
+    }
+  }
+
   function sampleSceneTemplates() {
-    return createSampleSceneTemplates().map(entry => normalizeComponentTemplateEntry(entry, "scene"));
+    const builtins = builtinSampleSceneTemplates();
+    const builtinsById = new Map(builtins.map(entry => [entry.sampleId, entry]));
+    const custom = loadCustomSampleSceneTemplates();
+    const merged = new Map();
+    for (const builtin of builtins) {
+      merged.set(builtin.sampleId, normalizeSampleSceneTemplateEntry(Object.assign({}, builtin, {
+        source: "builtin",
+        backupAvailable: false,
+        isCustom: false
+      }), builtin.category));
+    }
+    for (const customEntry of custom) {
+      const sampleId = customEntry.sampleId;
+      const hasBackup = builtinsById.has(sampleId);
+      merged.set(sampleId, normalizeSampleSceneTemplateEntry(Object.assign({}, customEntry, {
+        source: hasBackup ? "custom-override" : "custom",
+        backupAvailable: hasBackup,
+        isCustom: true
+      }), customEntry.category));
+    }
+    return Array.from(merged.values()).sort((a, b) => {
+      const ao = sampleCategoryOrder(a.category);
+      const bo = sampleCategoryOrder(b.category);
+      if (ao !== bo) return ao - bo;
+      return String(a.name || a.sampleId).localeCompare(String(b.name || b.sampleId), "ja");
+    });
+  }
+
+  function activeSceneSampleLink() {
+    const scene = activeScene();
+    if (!scene) return null;
+    const links = ensureSceneSampleLinks();
+    return links[scene.id] || null;
+  }
+
+  function saveCurrentSceneToSampleEntry(sampleDef = {}) {
+    const scene = activeScene();
+    if (!scene) {
+      showToast("保存対象シーンがありません");
+      return false;
+    }
+    const payload = buildTemplatePayload({ kind: "scene", sceneId: scene.id });
+    if (!payload?.scene) {
+      showToast("シーン保存データを作成できませんでした");
+      return false;
+    }
+    const sampleId = safeId(sampleDef.sampleId || sampleDef.id || scene.id || "sampleScene", "sampleScene");
+    const category = normalizeSampleCategory(sampleDef.category || activeSceneSampleLink()?.category || "custom");
+    const name = String(sampleDef.name || scene.name || sampleId).trim() || sampleId;
+    const description = String(sampleDef.description || "").trim();
+    const customList = loadCustomSampleSceneTemplates();
+    const next = normalizeSampleSceneTemplateEntry({
+      id: sampleId,
+      sampleId,
+      kind: "scene",
+      name,
+      category,
+      description,
+      savedAt: new Date().toISOString(),
+      version: TOOL_VERSION,
+      source: "custom",
+      data: scrubTemplateData(payload)
+    }, category);
+    const filtered = customList.filter(entry => String(entry.sampleId || entry.id || "") !== sampleId);
+    filtered.push(next);
+    if (!saveCustomSampleSceneTemplates(filtered)) return false;
+    runStateMutation("シーンサンプル紐付け", () => {
+      const links = ensureSceneSampleLinks();
+      links[scene.id] = { sampleId, category, name };
+    });
+    showToast(`サンプル保存しました: ${name}`);
+    return true;
+  }
+
+  function saveCurrentSceneAsNewSamplePrompt() {
+    const scene = activeScene();
+    if (!scene) {
+      showToast("保存対象シーンがありません");
+      return false;
+    }
+    const defaultName = scene.name || scene.id || "新規サンプル";
+    const name = window.prompt ? window.prompt("サンプル名を入力してください", defaultName) : defaultName;
+    if (name === null) return false;
+    const defaultId = safeId(`${scene.id || "sample"}_custom`, "sample_custom");
+    const sampleId = window.prompt ? window.prompt("サンプルIDを入力してください（半角英数/記号）", defaultId) : defaultId;
+    if (sampleId === null) return false;
+    const categoryRaw = window.prompt ? window.prompt("カテゴリを入力してください（basic / advanced / custom）", "custom") : "custom";
+    if (categoryRaw === null) return false;
+    return saveCurrentSceneToSampleEntry({
+      sampleId,
+      name: String(name || "").trim() || defaultName,
+      category: normalizeSampleCategory(categoryRaw),
+      description: `ユーザー保存 (${new Date().toLocaleString("ja-JP")})`
+    });
+  }
+
+  function saveCurrentSceneToLinkedSample() {
+    const linked = activeSceneSampleLink();
+    if (!linked?.sampleId) {
+      showToast("このシーンはサンプルに紐付いていません。新規保存を使ってください。");
+      return false;
+    }
+    const current = sampleSceneTemplates().find(entry => entry.sampleId === linked.sampleId);
+    return saveCurrentSceneToSampleEntry({
+      sampleId: linked.sampleId,
+      name: current?.name || linked.name || activeScene()?.name || linked.sampleId,
+      category: current?.category || linked.category || "custom",
+      description: current?.description || ""
+    });
+  }
+
+  function resetSampleSceneToBackup(sampleId) {
+    const key = String(sampleId || "").trim();
+    if (!key) return false;
+    const custom = loadCustomSampleSceneTemplates();
+    const next = custom.filter(entry => String(entry.sampleId || entry.id || "") !== key);
+    if (next.length === custom.length) return false;
+    if (!saveCustomSampleSceneTemplates(next)) return false;
+    showToast(`サンプルを初期化しました: ${key}`);
+    return true;
+  }
+
+  function resetAllSampleSceneCustomizations() {
+    if (!saveCustomSampleSceneTemplates([])) return false;
+    showToast("サンプルのカスタム保存をすべて初期化しました");
+    return true;
   }
 
   function chooseSampleSceneTemplateAsync() {
-    const list = sampleSceneTemplates();
-    if (!list.length) {
+    if (!sampleSceneTemplates().length) {
       showToast("読み込めるサンプルがありません");
       return Promise.resolve(null);
     }
@@ -4548,13 +4809,30 @@
       overlay.id = "dbSamplePickerOverlay";
       overlay.style.cssText = "position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.58);display:flex;align-items:center;justify-content:center;";
       const panel = document.createElement("div");
-      panel.style.cssText = "width:min(520px,calc(100vw - 40px));max-height:calc(100vh - 60px);overflow:auto;background:#161d2b;color:#eef4ff;border:1px solid #40506d;border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.45);padding:16px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
+      panel.style.cssText = "width:min(780px,calc(100vw - 40px));max-height:calc(100vh - 60px);overflow:auto;background:#161d2b;color:#eef4ff;border:1px solid #40506d;border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.45);padding:16px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
       const title = document.createElement("div");
-      title.textContent = "サンプル読込";
+      title.textContent = "サンプル管理";
       title.style.cssText = "font-size:18px;font-weight:800;margin-bottom:6px;";
       const help = document.createElement("div");
-      help.textContent = "読み込むサンプルを選択してください。現在のレイアウトへ追加されます。";
+      help.textContent = "基礎編/応用編を選んで読み込みます。現在シーンの保存や初期化（バックアップ復元）もここで実行できます。";
       help.style.cssText = "font-size:12px;color:#b9c8df;margin-bottom:12px;";
+      const controls = document.createElement("div");
+      controls.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;";
+      const saveNewBtn = document.createElement("button");
+      saveNewBtn.type = "button";
+      saveNewBtn.textContent = "現在シーンを新規サンプル保存";
+      saveNewBtn.style.cssText = "border:1px solid #466ca1;background:#2a4668;color:#fff;border-radius:8px;padding:8px 10px;cursor:pointer;";
+      const saveLinkedBtn = document.createElement("button");
+      saveLinkedBtn.type = "button";
+      saveLinkedBtn.textContent = "現在シーンを紐付サンプルへ上書き";
+      saveLinkedBtn.style.cssText = "border:1px solid #4a5b76;background:#283449;color:#fff;border-radius:8px;padding:8px 10px;cursor:pointer;";
+      const resetAllBtn = document.createElement("button");
+      resetAllBtn.type = "button";
+      resetAllBtn.textContent = "サンプル編集を全初期化";
+      resetAllBtn.style.cssText = "border:1px solid #8d5562;background:#4d2d38;color:#fff;border-radius:8px;padding:8px 10px;cursor:pointer;";
+      controls.appendChild(saveNewBtn);
+      controls.appendChild(saveLinkedBtn);
+      controls.appendChild(resetAllBtn);
       const listBox = document.createElement("div");
       listBox.style.cssText = "display:flex;flex-direction:column;gap:8px;";
       const cleanup = value => {
@@ -4570,23 +4848,103 @@
         }
       };
       document.addEventListener("keydown", onKeyDown, true);
-      for (const entry of list) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.style.cssText = "text-align:left;width:100%;border:1px solid #435574;background:#222d42;color:#f6f9ff;border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:700;";
-        btn.innerHTML = `<div>${escapeHtml(entry.name || entry.id)}</div><div style="font-size:11px;color:#aebbd1;margin-top:3px;">${escapeHtml(entry.id || "sample")}</div>`;
-        btn.addEventListener("click", ev => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          cleanup(entry);
-        });
-        listBox.appendChild(btn);
-      }
+
+      const renderList = () => {
+        listBox.innerHTML = "";
+        const grouped = new Map([["basic", []], ["advanced", []], ["custom", []]]);
+        for (const entry of sampleSceneTemplates()) {
+          const category = normalizeSampleCategory(entry.category);
+          if (!grouped.has(category)) grouped.set(category, []);
+          grouped.get(category).push(entry);
+        }
+        for (const category of ["basic", "advanced", "custom"]) {
+          const entries = grouped.get(category) || [];
+          if (!entries.length) continue;
+          const heading = document.createElement("div");
+          heading.textContent = sampleCategoryLabel(category);
+          heading.style.cssText = "font-size:13px;font-weight:800;color:#c9d8f4;margin:8px 0 4px;";
+          listBox.appendChild(heading);
+          for (const entry of entries) {
+            const card = document.createElement("div");
+            card.style.cssText = "border:1px solid #435574;background:#222d42;border-radius:8px;padding:10px 12px;";
+            const titleRow = document.createElement("div");
+            titleRow.style.cssText = "display:flex;gap:8px;align-items:flex-start;justify-content:space-between;";
+            const info = document.createElement("div");
+            info.innerHTML = `<div style="font-weight:800;">${escapeHtml(entry.name || entry.sampleId)}</div><div style="font-size:11px;color:#aebbd1;margin-top:3px;">${escapeHtml(entry.sampleId || "sample")}</div>${entry.description ? `<div style="font-size:11px;color:#c7d7f2;margin-top:4px;">${escapeHtml(entry.description)}</div>` : ""}`;
+            const actions = document.createElement("div");
+            actions.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;";
+            const loadBtn = document.createElement("button");
+            loadBtn.type = "button";
+            loadBtn.textContent = "読込";
+            loadBtn.style.cssText = "border:1px solid #4f6991;background:#32507a;color:#fff;border-radius:7px;padding:6px 10px;cursor:pointer;";
+            loadBtn.addEventListener("click", ev => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              cleanup(entry);
+            });
+            const saveBtn = document.createElement("button");
+            saveBtn.type = "button";
+            saveBtn.textContent = "現在シーンで上書き";
+            saveBtn.style.cssText = "border:1px solid #4a5b76;background:#2b394f;color:#fff;border-radius:7px;padding:6px 10px;cursor:pointer;";
+            saveBtn.addEventListener("click", ev => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              if (saveCurrentSceneToSampleEntry({
+                sampleId: entry.sampleId,
+                name: entry.name,
+                category: entry.category,
+                description: entry.description
+              })) renderList();
+            });
+            actions.appendChild(loadBtn);
+            actions.appendChild(saveBtn);
+            if (entry.isCustom) {
+              const resetBtn = document.createElement("button");
+              resetBtn.type = "button";
+              resetBtn.textContent = entry.backupAvailable ? "初期化" : "削除";
+              resetBtn.style.cssText = "border:1px solid #875566;background:#4d2f3b;color:#fff;border-radius:7px;padding:6px 10px;cursor:pointer;";
+              resetBtn.addEventListener("click", ev => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const message = entry.backupAvailable
+                  ? `サンプル「${entry.name}」を初期状態へ戻します。よろしいですか？`
+                  : `カスタムサンプル「${entry.name}」を削除します。よろしいですか？`;
+                if (!confirm(message)) return;
+                if (resetSampleSceneToBackup(entry.sampleId)) renderList();
+              });
+              actions.appendChild(resetBtn);
+            }
+            titleRow.appendChild(info);
+            titleRow.appendChild(actions);
+            card.appendChild(titleRow);
+            listBox.appendChild(card);
+          }
+        }
+      };
+
+      saveNewBtn.addEventListener("click", ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (saveCurrentSceneAsNewSamplePrompt()) renderList();
+      });
+      saveLinkedBtn.addEventListener("click", ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (saveCurrentSceneToLinkedSample()) renderList();
+      });
+      resetAllBtn.addEventListener("click", ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (!confirm("カスタム保存したサンプルをすべて初期化します。よろしいですか？")) return;
+        if (resetAllSampleSceneCustomizations()) renderList();
+      });
+
+      renderList();
       const footer = document.createElement("div");
       footer.style.cssText = "display:flex;justify-content:flex-end;margin-top:14px;";
       const cancel = document.createElement("button");
       cancel.type = "button";
-      cancel.textContent = "キャンセル";
+      cancel.textContent = "閉じる";
       cancel.style.cssText = "border:1px solid #4a5b76;background:#283449;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer;";
       cancel.addEventListener("click", ev => {
         ev.preventDefault();
@@ -4596,6 +4954,7 @@
       footer.appendChild(cancel);
       panel.appendChild(title);
       panel.appendChild(help);
+      panel.appendChild(controls);
       panel.appendChild(listBox);
       panel.appendChild(footer);
       overlay.appendChild(panel);
@@ -11538,6 +11897,7 @@ ${choiceRuleStructComment()}
     if (!Array.isArray(data.scenes)) data.scenes = [];
     state.groups = data.groups;
     state.scenes = data.scenes;
+    state.sceneSampleLinks = (data.sceneSampleLinks && typeof data.sceneSampleLinks === "object") ? cloneForHistory(data.sceneSampleLinks) : {};
     state.compositePresetLibraries = (Array.isArray(data.compositePresetLibraries) ? data.compositePresetLibraries : []).map(lib => normalizeCompositePresetLibrary(lib));
     state.componentTemplates = normalizeComponentTemplates(data.componentTemplates);
     state.activeSceneId = normalizeSceneId(data.activeSceneId || state.activeSceneId || "");

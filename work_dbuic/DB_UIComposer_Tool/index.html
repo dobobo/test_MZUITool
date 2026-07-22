@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DB_UIComposer Tool v0.3.98</title>
+  <title>DB_UIComposer Tool</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand-block">
-      <h1>DB_UIComposer Tool <span>v0.3.98</span></h1>
+      <h1>DB_UIComposer Tool <span id="toolVersionLabel">v0.4.47</span></h1>
       <p>RPGツクールMZ用 UI配置プレビュー → JSON / 実行スクリプト出力</p>
     </div>
     <div class="top-mode-switch" aria-label="位置ロック切替">
@@ -46,7 +46,7 @@
       <button id="openCompositePresetManagerTopBtn" title="PSDごとの統合画像プリセットを独立管理します。メイン上の統合画像パーツには依存しません。">統合画像プリセット管理</button>
       <button id="saveLocalBtn" title="現在のツールデータを保存します（Ctrl+S）。保存先が未指定の場合は新規保存ダイアログを開きます。">保存</button>
       <button id="loadLocalBtn" title="保存したツールデータを読み込みます。対応ブラウザではプロジェクトも再読込します。">データ読込</button>
-      <button id="loadSampleBtn" title="同梱サンプルを現在のレイアウトへ読み込みます。">サンプル読込</button>
+      <button id="loadSampleBtn" title="基礎編/応用編サンプルの読込・保存・初期化を行います。">サンプル管理</button>
       <input id="toolDataInput" type="file" accept=".json,application/json" hidden>
       <button id="resetBtn" class="danger" title="現在の配置データを初期状態に戻します。">初期化</button>
     </div>
