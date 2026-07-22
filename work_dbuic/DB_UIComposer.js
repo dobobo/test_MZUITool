@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.47 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.48 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -54,6 +54,7 @@
  * v0.4.45では、複合画像の書き出しPNG参照時に folder/fileName の参照元を一致させ、実機での画像未表示を抑制しています。
  * v0.4.46では、ツール側でMZ出力時の複合画像自動書き出し確認を強化し、未書き出しによる実機表示漏れを起こしにくくしています。
  * v0.4.47では、サンプル管理を基礎編/応用編へ整理し、編集保存とバックアップ初期化の導線を強化しています。
+ * v0.4.48では、文字/ゲージにデータベース参照カテゴリを追加し、段階選択と更新タイミング（毎フレーム/手動/表示時）に対応しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -178,6 +179,25 @@
  * @command DumpDebugInfo
  * @text デバッグ情報出力
  * @desc 現在保持しているレイアウト、ウィンドウ、パーツ情報をコンソールへ出力します。
+ *
+ * @command RefreshDatabaseBindings
+ * @text データベース参照の手動更新
+ * @desc データベース更新タイミングを「プラグインコマンド更新」にしたパーツを手動更新します。
+ *
+ * @arg layoutId
+ * @text レイアウトID（空で全体）
+ * @type string
+ * @default
+ *
+ * @arg windowId
+ * @text ウィンドウID（空で対象レイアウト全体）
+ * @type string
+ * @default
+ *
+ * @arg itemId
+ * @text パーツID（空で対象ウィンドウ全体）
+ * @type string
+ * @default
  *
  * @command AddLogText
  * @text ログを1行追加
@@ -1993,6 +2013,229 @@
     return { x, y, width: maxX, height: maxY };
   };
 
+  const normalizeDatabaseBinding = src => {
+    const def = src && typeof src === "object" ? src : {};
+    const norm = {
+      enabled: toBool(def.enabled, false),
+      sourceType: String(def.sourceType || "actor"),
+      objectType: String(def.objectType || "item"),
+      idMode: String(def.idMode || "fixed"),
+      id: Math.max(0, toNumber(def.id, 1)),
+      idVariableId: Math.max(0, toNumber(def.idVariableId, 1)),
+      fieldPath: String(def.fieldPath || "name"),
+      typeCategory: String(def.typeCategory || "weaponTypes"),
+      termCategory: String(def.termCategory || "messages"),
+      termKey: String(def.termKey || ""),
+      updateTiming: String(def.updateTiming || "autoFrame"),
+      textPrefix: String(def.textPrefix || ""),
+      textSuffix: String(def.textSuffix || ""),
+      emptyText: String(def.emptyText || ""),
+      decimals: toNumber(def.decimals, -1),
+      maxSourceType: String(def.maxSourceType || ""),
+      maxObjectType: String(def.maxObjectType || "item"),
+      maxIdMode: String(def.maxIdMode || "fixed"),
+      maxId: Math.max(0, toNumber(def.maxId, 1)),
+      maxIdVariableId: Math.max(0, toNumber(def.maxIdVariableId, 1)),
+      maxFieldPath: String(def.maxFieldPath || ""),
+      maxTypeCategory: String(def.maxTypeCategory || "weaponTypes"),
+      maxTermCategory: String(def.maxTermCategory || "messages"),
+      maxTermKey: String(def.maxTermKey || ""),
+      maxFallback: Math.max(1, toNumber(def.maxFallback, 100))
+    };
+    if (!["autoFrame", "pluginCommand", "windowOpen"].includes(norm.updateTiming)) norm.updateTiming = "autoFrame";
+    if (!["fixed", "variable"].includes(norm.idMode)) norm.idMode = "fixed";
+    if (!["fixed", "variable"].includes(norm.maxIdMode)) norm.maxIdMode = "fixed";
+    if (norm.decimals < 0) norm.decimals = -1;
+    return norm;
+  };
+
+  const dbBindingUpdateTiming = binding => {
+    const mode = String(binding?.updateTiming || "autoFrame");
+    return ["autoFrame", "pluginCommand", "windowOpen"].includes(mode) ? mode : "autoFrame";
+  };
+
+  const databaseBindingIdValue = (binding, keyPrefix = "") => {
+    const idMode = String(binding?.[`${keyPrefix}IdMode`] || "fixed");
+    const fixedId = Math.max(0, toNumber(binding?.[`${keyPrefix}Id`], 0));
+    const variableId = Math.max(0, toNumber(binding?.[`${keyPrefix}IdVariableId`], 0));
+    if (idMode === "variable" && variableId > 0) return Math.max(0, toNumber($gameVariables.value(variableId), fixedId || 0));
+    return fixedId;
+  };
+
+  const resolveObjectPathValue = (base, path) => {
+    if (base == null) return null;
+    const raw = String(path || "").trim();
+    if (!raw || raw === "self") return base;
+    const tokens = raw.replace(/\[(\d+)\]/g, '.$1').split('.').map(v => String(v || '').trim()).filter(Boolean);
+    let cur = base;
+    for (const token of tokens) {
+      if (cur == null) return null;
+      cur = cur[token];
+    }
+    return cur;
+  };
+
+  const databaseTypeValue = (binding, keyPrefix = "") => {
+    const category = String(binding?.[`${keyPrefix}TypeCategory`] || binding?.typeCategory || "weaponTypes");
+    const index = databaseBindingIdValue(binding, keyPrefix);
+    const system = $dataSystem || {};
+    const table = {
+      elements: system.elements || [],
+      weaponTypes: system.weaponTypes || [],
+      armorTypes: system.armorTypes || [],
+      skillTypes: system.skillTypes || [],
+      equipTypes: system.equipTypes || [],
+      params: system.terms?.params || []
+    }[category] || [];
+    return table[index] ?? "";
+  };
+
+  const databaseTermValue = (binding, keyPrefix = "") => {
+    const category = String(binding?.[`${keyPrefix}TermCategory`] || binding?.termCategory || "messages");
+    const key = String(binding?.[`${keyPrefix}TermKey`] || binding?.termKey || "currencyUnit");
+    const terms = ($dataSystem && $dataSystem.terms) ? $dataSystem.terms : {};
+    const table = terms[category];
+    if (Array.isArray(table)) {
+      const index = key === "" ? databaseBindingIdValue(binding, keyPrefix) : toNumber(key, -1);
+      return table[index] ?? "";
+    }
+    if (table && typeof table === "object") {
+      return table[key] ?? "";
+    }
+    return "";
+  };
+
+  const findRuntimeEnemyByDatabaseId = enemyId => {
+    if (!$gameTroop || typeof $gameTroop.members !== "function") return null;
+    const id = Math.max(0, toNumber(enemyId, 0));
+    if (id <= 0) return null;
+    const members = $gameTroop.members() || [];
+    return members.find(enemy => enemy && typeof enemy.enemyId === "function" && enemy.enemyId() === id) || null;
+  };
+
+  const databaseActorFieldValue = (actor, fieldPath) => {
+    if (!actor) return null;
+    const key = String(fieldPath || "name");
+    if (key === "name") return actor.name ? actor.name() : "";
+    if (key === "nickname") return actor.nickname ? actor.nickname() : "";
+    if (key === "profile") return actor.profile ? actor.profile() : "";
+    if (key === "className") return actor.currentClass && actor.currentClass() ? String(actor.currentClass().name || "") : "";
+    if (key === "level") return toNumber(actor.level, actor._level || 0);
+    if (key === "hp") return toNumber(actor.hp, 0);
+    if (key === "mhp") return toNumber(actor.mhp, 1);
+    if (key === "mp") return toNumber(actor.mp, 0);
+    if (key === "mmp") return toNumber(actor.mmp, 1);
+    if (key === "tp") return toNumber(actor.tp, 0);
+    if (key === "maxTp") return actor.maxTp ? toNumber(actor.maxTp(), 100) : 100;
+    if (key === "currentExp") return actor.currentExp ? toNumber(actor.currentExp(), 0) : 0;
+    if (key === "nextRequiredExp") return actor.nextRequiredExp ? toNumber(actor.nextRequiredExp(), 0) : 0;
+    const pm = key.match(/^(param|xparam|sparam)\[(\d+)\]$/i);
+    if (pm) {
+      const idx = toNumber(pm[2], 0);
+      if (pm[1] === "param" && actor.param) return toNumber(actor.param(idx), 0);
+      if (pm[1] === "xparam" && actor.xparam) return toNumber(actor.xparam(idx), 0);
+      if (pm[1] === "sparam" && actor.sparam) return toNumber(actor.sparam(idx), 0);
+    }
+    return resolveObjectPathValue(actor, key);
+  };
+
+  const databaseEnemyFieldValue = (enemyId, fieldPath) => {
+    const enemyData = $dataEnemies ? $dataEnemies[Math.max(0, toNumber(enemyId, 0))] : null;
+    const battler = findRuntimeEnemyByDatabaseId(enemyId);
+    const key = String(fieldPath || "name");
+    if (key === "name") return battler && battler.name ? battler.name() : String(enemyData?.name || "");
+    if (key === "hp") return battler ? toNumber(battler.hp, 0) : null;
+    if (key === "mhp") return battler ? toNumber(battler.mhp, 1) : toNumber(enemyData?.params?.[0], 1);
+    if (key === "mp") return battler ? toNumber(battler.mp, 0) : null;
+    if (key === "mmp") return battler ? toNumber(battler.mmp, 1) : toNumber(enemyData?.params?.[1], 1);
+    if (key === "tp") return battler ? toNumber(battler.tp, 0) : null;
+    const pm = key.match(/^param\[(\d+)\]$/i);
+    if (pm) {
+      const idx = toNumber(pm[1], 0);
+      if (battler && battler.param) return toNumber(battler.param(idx), 0);
+      return toNumber(enemyData?.params?.[idx], 0);
+    }
+    const base = battler || enemyData;
+    return resolveObjectPathValue(base, key);
+  };
+
+  const databaseObjectByTypeAndId = (sourceType, objectType, id) => {
+    const sid = Math.max(0, toNumber(id, 0));
+    if (sourceType === "variable") return sid > 0 ? $gameVariables.value(sid) : 0;
+    if (sourceType === "gold") return $gameParty ? toNumber($gameParty.gold(), 0) : 0;
+    if (sourceType === "type") return null;
+    if (sourceType === "term") return null;
+    if (sourceType === "actor") return $gameActors ? $gameActors.actor(Math.max(1, sid || 1)) : null;
+    if (sourceType === "enemy") return sid > 0 && $dataEnemies ? ($dataEnemies[sid] || null) : null;
+    if (sourceType === "state") return sid > 0 && $dataStates ? ($dataStates[sid] || null) : null;
+    const actual = sourceType === "databaseObject" ? String(objectType || "item") : sourceType;
+    const map = {
+      item: $dataItems,
+      weapon: $dataWeapons,
+      armor: $dataArmors,
+      skill: $dataSkills,
+      class: $dataClasses
+    };
+    const table = map[actual];
+    return table && sid > 0 ? (table[sid] || null) : null;
+  };
+
+  const databaseBindingRawValue = (binding, keyPrefix = "") => {
+    const sourceKey = keyPrefix ? `${keyPrefix}SourceType` : "sourceType";
+    const objectKey = keyPrefix ? `${keyPrefix}ObjectType` : "objectType";
+    const fieldKey = keyPrefix ? `${keyPrefix}FieldPath` : "fieldPath";
+    const sourceType = String(binding?.[sourceKey] || binding?.sourceType || "actor");
+    if (sourceType === "gold") return $gameParty ? toNumber($gameParty.gold(), 0) : 0;
+    if (sourceType === "type") return databaseTypeValue(binding, keyPrefix);
+    if (sourceType === "term") return databaseTermValue(binding, keyPrefix);
+
+    const id = databaseBindingIdValue(binding, keyPrefix);
+    if (sourceType === "variable") {
+      const base = id > 0 ? $gameVariables.value(id) : 0;
+      const fieldPath = String(binding?.[fieldKey] || "").trim();
+      return fieldPath ? resolveObjectPathValue(base, fieldPath) : base;
+    }
+    if (sourceType === "actor") {
+      const actor = databaseObjectByTypeAndId("actor", "", id);
+      return databaseActorFieldValue(actor, binding?.[fieldKey] || "name");
+    }
+    if (sourceType === "enemy") {
+      return databaseEnemyFieldValue(id, binding?.[fieldKey] || "name");
+    }
+    const base = databaseObjectByTypeAndId(sourceType, binding?.[objectKey] || binding?.objectType, id);
+    return resolveObjectPathValue(base, binding?.[fieldKey] || "name");
+  };
+
+  const databaseBindingTextValue = binding => {
+    if (!binding || binding.enabled !== true) return null;
+    const raw = databaseBindingRawValue(binding, "");
+    if (raw === null || raw === undefined || raw === "") return String(binding.emptyText || "");
+    let text = "";
+    if (typeof raw === "number") {
+      const dec = toNumber(binding.decimals, -1);
+      text = dec >= 0 ? Number(raw).toFixed(Math.max(0, dec)) : String(raw);
+    } else if (typeof raw === "string") {
+      text = raw;
+    } else {
+      try {
+        text = JSON.stringify(raw);
+      } catch (_) {
+        text = String(raw);
+      }
+    }
+    return `${String(binding.textPrefix || "")}${text}${String(binding.textSuffix || "")}`;
+  };
+
+  const databaseBindingGaugeValues = binding => {
+    if (!binding || binding.enabled !== true) return null;
+    const valueRaw = databaseBindingRawValue(binding, "");
+    const hasMaxSource = String(binding.maxSourceType || "").trim().length > 0;
+    const maxRaw = hasMaxSource ? databaseBindingRawValue(binding, "max") : null;
+    const value = toNumber(valueRaw, 0);
+    const max = hasMaxSource ? Math.max(1, toNumber(maxRaw, 1)) : Math.max(1, toNumber(binding.maxFallback, 100));
+    return { value, max };
+  };
+
   const adjustWindowDefinitionForChoiceLists = definition => {
     const def = Object.assign({}, definition || {});
     const items = Array.isArray(def.items) ? def.items : [];
@@ -2331,6 +2574,7 @@
         item.zOrder = toNumber(item.zOrder, 0);
         item.visible = toBool(item.visible, true);
         item.allowOutsideWindow = toBool(item.allowOutsideWindow, false);
+        item.databaseBinding = normalizeDatabaseBinding(item.databaseBinding);
         if (item.type === "image") {
           item.width = Math.max(0, toNumber(item.width, 0));
           item.height = Math.max(0, toNumber(item.height, 0));
@@ -3366,16 +3610,28 @@
         parts.push("log:" + logState.lines.map(line => this.convertEscapeCharacters(String(line))).join("\n"));
       }
       for (const item of items) {
+        const binding = normalizeDatabaseBinding(item.databaseBinding);
+        const timing = dbBindingUpdateTiming(binding);
         if (item.type === "gauge") {
-          const v = this.gaugeValues(item);
-          parts.push(`${item.id}:${v.value}/${v.max}`);
+          if (binding.enabled && timing === "autoFrame") {
+            const bound = databaseBindingGaugeValues(binding);
+            if (bound) parts.push(`${item.id}:db:${bound.value}/${bound.max}`);
+          } else if (!binding.enabled) {
+            const v = this.gaugeValues(item);
+            parts.push(`${item.id}:${v.value}/${v.max}`);
+          }
         } else if (item.type === "choiceList") {
           const text = choiceListRows(item).join("\n");
           if (text.includes("\\V[")) parts.push(`${item.id}:${this.convertEscapeCharacters(text)}`);
         } else if (item.type === "text" || item.type === "button") {
-          const text = normalizeMZControlPrefix(item.text || "");
-          if (text.includes("\\V[")) {
-            parts.push(`${item.id}:${this.convertEscapeCharacters(text)}`);
+          if (item.type === "text" && binding.enabled && timing === "autoFrame") {
+            const dbText = databaseBindingTextValue(binding);
+            parts.push(`${item.id}:dbText:${String(dbText ?? "")}`);
+          } else {
+            const text = normalizeMZControlPrefix(item.text || "");
+            if (text.includes("\\V[")) {
+              parts.push(`${item.id}:${this.convertEscapeCharacters(text)}`);
+            }
           }
         }
       }
@@ -3940,7 +4196,9 @@
 
     dbStableTextBitmap(item, style) {
       this._dbUiTextBitmapCache = this._dbUiTextBitmapCache || {};
-      const rawText = normalizeMZControlPrefix(item.text || "");
+      const binding = normalizeDatabaseBinding(item.databaseBinding);
+      const sourceText = binding.enabled ? databaseBindingTextValue(binding) : item.text;
+      const rawText = normalizeMZControlPrefix(sourceText || "");
       const convertedText = this.convertEscapeCharacters(rawText);
       const align = String(item.align || "left");
       const size = this.dbStableTextBitmapSize(item, convertedText, style);
@@ -4092,6 +4350,11 @@
     }
 
     gaugeValues(item) {
+      const binding = normalizeDatabaseBinding(item.databaseBinding);
+      if (binding.enabled) {
+        const values = databaseBindingGaugeValues(binding);
+        if (values) return values;
+      }
       const type = String(item.valueType || "variable");
       if (type === "actorHp" || type === "actorMp" || type === "actorTp") {
         const actor = $gameActors.actor(toNumber(item.actorId, 1));
@@ -5218,6 +5481,23 @@
     }
   };
 
+  Scene_Map.prototype.dbUiComposerRefreshDatabaseBindings = function(options = {}) {
+    const layoutId = String(options.layoutId || "").trim();
+    const windowId = String(options.windowId || "").trim();
+    const itemId = String(options.itemId || "").trim();
+    const windows = Array.isArray(this._dbUiComposerWindows) ? this._dbUiComposerWindows : [];
+    for (const win of windows) {
+      if (!win || win._dbUiDisposed) continue;
+      if (layoutId && String(win._dbUiComposerLayoutId || "") !== layoutId) continue;
+      if (windowId && String(win._dbUiComposerWindowId || "") !== windowId) continue;
+      if (itemId) {
+        const items = win._dbUiDefinition?.items || [];
+        if (!items.some(item => String(item?.id || "") === itemId)) continue;
+      }
+      if (typeof win.refresh === "function") win.refresh("databaseBindingCommand");
+    }
+  };
+
   const _Scene_Map_update = Scene_Map.prototype.update;
   Scene_Map.prototype.update = function() {
     _Scene_Map_update.call(this);
@@ -5264,6 +5544,19 @@
 
   PluginManager.registerCommand(PLUGIN_NAME, "DumpDebugInfo", () => {
     dumpDebugInfo();
+  });
+
+  PluginManager.registerCommand(PLUGIN_NAME, "RefreshDatabaseBindings", args => {
+    const scene = SceneManager._scene;
+    if (scene && typeof scene.dbUiComposerRefreshDatabaseBindings === "function") {
+      scene.dbUiComposerRefreshDatabaseBindings({
+        layoutId: String(args.layoutId || ""),
+        windowId: String(args.windowId || ""),
+        itemId: String(args.itemId || "")
+      });
+    } else if (scene && typeof scene.dbUiComposerRefresh === "function") {
+      scene.dbUiComposerRefresh();
+    }
   });
 
   PluginManager.registerCommand(PLUGIN_NAME, "AddLogText", args => {
@@ -5747,7 +6040,7 @@
   });
 
   window.DB_UIComposer = {
-    version: "0.4.47",
+    version: "0.4.48",
     applyLayout,
     refreshScene,
     normalizeLayout,

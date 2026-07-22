@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.47";
+  const TOOL_VERSION = "0.4.48";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -239,6 +239,53 @@
       previewNaturalHeight: 0,
       kind
     };
+  }
+
+  function createDefaultDatabaseBinding() {
+    return {
+      enabled: false,
+      sourceType: "actor",
+      objectType: "item",
+      idMode: "fixed",
+      id: 1,
+      idVariableId: 1,
+      fieldPath: "name",
+      typeCategory: "weaponTypes",
+      termCategory: "messages",
+      termKey: "currencyUnit",
+      updateTiming: "autoFrame",
+      textPrefix: "",
+      textSuffix: "",
+      emptyText: "",
+      decimals: -1,
+      maxSourceType: "",
+      maxObjectType: "item",
+      maxIdMode: "fixed",
+      maxId: 1,
+      maxIdVariableId: 1,
+      maxFieldPath: "",
+      maxTypeCategory: "weaponTypes",
+      maxTermCategory: "messages",
+      maxTermKey: "",
+      maxFallback: 100
+    };
+  }
+
+  function ensureDatabaseBinding(item) {
+    if (!item || typeof item !== "object") return createDefaultDatabaseBinding();
+    item.databaseBinding = Object.assign(createDefaultDatabaseBinding(), item.databaseBinding || {});
+    const db = item.databaseBinding;
+    db.enabled = db.enabled === true;
+    if (!["fixed", "variable"].includes(String(db.idMode || ""))) db.idMode = "fixed";
+    if (!["fixed", "variable"].includes(String(db.maxIdMode || ""))) db.maxIdMode = "fixed";
+    if (!["autoFrame", "pluginCommand", "windowOpen"].includes(String(db.updateTiming || ""))) db.updateTiming = "autoFrame";
+    db.id = Math.max(0, Number(db.id || 0));
+    db.idVariableId = Math.max(0, Number(db.idVariableId || 0));
+    db.maxId = Math.max(0, Number(db.maxId || 0));
+    db.maxIdVariableId = Math.max(0, Number(db.maxIdVariableId || 0));
+    db.decimals = Number.isFinite(Number(db.decimals)) ? Number(db.decimals) : -1;
+    db.maxFallback = Math.max(1, Number(db.maxFallback || 100));
+    return db;
   }
 
   function ensureGaugeImageLayer(item, key, kind) {
@@ -2680,7 +2727,9 @@
     el.dataset.itemId = item.id;
 
     if (item.type === "text") {
-      setPreviewRichText(el, item.text || "", win, item, previewDefaultFontSize());
+      const dbText = previewDatabaseTextValue(item);
+      const previewText = dbText != null ? dbText : (item.text || "");
+      setPreviewRichText(el, previewText, win, item, previewDefaultFontSize());
       applyPreviewTextStyle(el, win, item, previewDefaultFontSize());
       el.style.transform = `translateY(${previewTextYOffset()}px)`;
       if (item.width > 0) {
@@ -8581,6 +8630,138 @@ ${choiceRuleStructComment()}
     addNumberInput("装飾表示順", deco.zOrder ?? 100, value => { deco.zOrder = Number(value) || 0; });
   }
 
+  function databaseFieldOptionsForSource(sourceType, objectType = "item") {
+    const actor = [
+      ["name", "名前"], ["nickname", "二つ名"], ["profile", "プロフィール"], ["className", "職業名"],
+      ["level", "レベル"], ["hp", "現在HP"], ["mhp", "最大HP"], ["mp", "現在MP"], ["mmp", "最大MP"], ["tp", "現在TP"], ["maxTp", "最大TP"],
+      ["currentExp", "現在経験値"], ["nextRequiredExp", "次レベル必要経験値"],
+      ["param[0]", "能力値:最大HP"], ["param[1]", "能力値:最大MP"], ["param[2]", "能力値:攻撃力"], ["param[3]", "能力値:防御力"],
+      ["param[4]", "能力値:魔法力"], ["param[5]", "能力値:魔法防御"], ["param[6]", "能力値:敏捷性"], ["param[7]", "能力値:運"],
+      ["xparam[0]", "追加能力値:命中率"], ["xparam[1]", "追加能力値:回避率"], ["xparam[2]", "追加能力値:会心率"], ["xparam[3]", "追加能力値:会心回避"],
+      ["xparam[4]", "追加能力値:魔法回避"], ["xparam[5]", "追加能力値:魔法反射"], ["xparam[6]", "追加能力値:反撃率"], ["xparam[7]", "追加能力値:HP再生"],
+      ["xparam[8]", "追加能力値:MP再生"], ["xparam[9]", "追加能力値:TP再生"],
+      ["sparam[0]", "特殊能力値:狙われ率"], ["sparam[1]", "特殊能力値:防御効果"], ["sparam[2]", "特殊能力値:回復効果"], ["sparam[3]", "特殊能力値:薬の知識"],
+      ["sparam[4]", "特殊能力値:MP消費率"], ["sparam[5]", "特殊能力値:TPチャージ率"], ["sparam[6]", "特殊能力値:物理ダメ率"], ["sparam[7]", "特殊能力値:魔法ダメ率"],
+      ["sparam[8]", "特殊能力値:床ダメ率"], ["sparam[9]", "特殊能力値:経験獲得率"]
+    ];
+    const commonObj = [
+      ["name", "名前"], ["description", "説明"], ["iconIndex", "アイコン番号"], ["note", "メモ"],
+      ["meta", "メタ情報(JSON)"], ["params[0]", "params[0]"], ["params[1]", "params[1]"], ["params[2]", "params[2]"], ["params[3]", "params[3]"],
+      ["params[4]", "params[4]"], ["params[5]", "params[5]"], ["params[6]", "params[6]"], ["params[7]", "params[7]"]
+    ];
+    const enemy = [["name", "名前"], ["hp", "現在HP(戦闘中)"], ["mhp", "最大HP"], ["mp", "現在MP(戦闘中)"], ["mmp", "最大MP"], ["tp", "現在TP(戦闘中)"], ["exp", "経験値"], ["gold", "所持金"], ...commonObj.filter(([k]) => k.startsWith("params["))];
+    const state = [["name", "名前"], ["description", "説明"], ["message1", "付与メッセージ"], ["message2", "継続メッセージ"], ["message3", "解除メッセージ"], ["message4", "味方解除メッセージ"], ["iconIndex", "アイコン番号"], ["priority", "優先度"], ["note", "メモ"], ["meta", "メタ情報(JSON)"]];
+    const bySource = {
+      actor,
+      variable: [["self", "変数の値"], ["toString", "文字列化" ]],
+      enemy,
+      state,
+      item: commonObj,
+      weapon: commonObj,
+      armor: commonObj,
+      skill: commonObj,
+      class: [["name", "名前"], ["note", "メモ"], ["params", "成長テーブル(JSON)"]],
+      databaseObject: commonObj
+    };
+    const src = sourceType === "databaseObject" ? String(objectType || "item") : String(sourceType || "actor");
+    const rows = bySource[src] || [["name", "名前"], ["self", "全体(JSON)"]];
+    return rows.map(([value, label]) => ({ value, label }));
+  }
+
+  function databaseTermKeyOptions(category) {
+    const c = String(category || "messages");
+    if (c === "messages") {
+      return ["alwaysDash", "commandRemember", "bgmVolume", "bgsVolume", "meVolume", "seVolume", "possession", "expTotal", "expNext", "saveMessage", "loadMessage", "file", "partyName", "emerge", "preemptive", "surprise", "escapeStart", "escapeFailure", "victory", "defeat", "obtainExp", "obtainGold", "obtainItem", "levelUp", "obtainSkill", "useItem", "criticalToEnemy", "criticalToActor", "actorDamage", "actorRecovery", "actorGain", "actorLoss", "actorDrain", "actorNoDamage", "actorNoHit", "enemyDamage", "enemyRecovery", "enemyGain", "enemyLoss", "enemyDrain", "enemyNoDamage", "enemyNoHit", "evasion", "magicEvasion", "magicReflection", "counterAttack", "substitute", "buffAdd", "debuffAdd", "buffRemove", "actionFailure"].map(k => ({ value: k, label: k }));
+    }
+    if (c === "commands") return ["fight", "escape", "attack", "guard", "item", "skill", "equip", "status", "formation", "save", "gameEnd", "options", "weapon", "armor", "keyItem", "optimize", "clear", "newGame", "continue_", "toTitle", "cancel", "buy", "sell"].map(k => ({ value: k === 'continue_' ? 'continue' : k, label: k === 'continue_' ? 'continue' : k }));
+    if (c === "basic") return [0,1,2,3,4,5,6,7,8,9,10].map(i => ({ value: String(i), label: `basic[${i}]` }));
+    if (c === "params") return [0,1,2,3,4,5,6,7].map(i => ({ value: String(i), label: `params[${i}]` }));
+    return [{ value: "currencyUnit", label: "currencyUnit" }];
+  }
+
+  function renderDatabaseBindingSection(item, options = {}) {
+    const db = ensureDatabaseBinding(item);
+    const mode = String(options.mode || "text");
+    const prefix = options.prefix || "";
+    const labelPrefix = options.labelPrefix || "";
+    const sourceKey = prefix ? `${prefix}SourceType` : "sourceType";
+    const objectKey = prefix ? `${prefix}ObjectType` : "objectType";
+    const idModeKey = prefix ? `${prefix}IdMode` : "idMode";
+    const idKey = prefix ? `${prefix}Id` : "id";
+    const idVarKey = prefix ? `${prefix}IdVariableId` : "idVariableId";
+    const fieldKey = prefix ? `${prefix}FieldPath` : "fieldPath";
+    const typeCategoryKey = prefix ? `${prefix}TypeCategory` : "typeCategory";
+    const termCategoryKey = prefix ? `${prefix}TermCategory` : "termCategory";
+    const termKeyKey = prefix ? `${prefix}TermKey` : "termKey";
+
+    const sourceOptions = [
+      { value: "actor", label: "アクターデータ" },
+      { value: "databaseObject", label: "アイテム/武器/防具/スキル/職業" },
+      { value: "variable", label: "変数" },
+      { value: "enemy", label: "エネミーデータ" },
+      { value: "state", label: "ステート" },
+      { value: "type", label: "タイプ" },
+      { value: "term", label: "用語" },
+      { value: "gold", label: "所持金" }
+    ];
+    if (prefix === "max") sourceOptions.unshift({ value: "", label: "未指定（フォールバック最大値を使用）" });
+    addSelect(`${labelPrefix}データ元`, (prefix === "max" ? (db[sourceKey] ?? "") : (db[sourceKey] || "actor")), sourceOptions, value => { db[sourceKey] = value; });
+
+    if (db[sourceKey] === "databaseObject") {
+      addSelect(`${labelPrefix}データ種別`, db[objectKey] || "item", [
+        { value: "item", label: "アイテム" },
+        { value: "weapon", label: "武器" },
+        { value: "armor", label: "防具" },
+        { value: "skill", label: "スキル" },
+        { value: "class", label: "職業" }
+      ], value => { db[objectKey] = value; });
+    }
+
+    if (!["gold", "term"].includes(String(db[sourceKey]))) {
+      addSelect(`${labelPrefix}ID参照`, db[idModeKey] || "fixed", [
+        { value: "fixed", label: "固定ID" },
+        { value: "variable", label: "変数でID指定" }
+      ], value => { db[idModeKey] = value; });
+      if (db[idModeKey] === "variable") addNumberInput(`${labelPrefix}ID変数`, db[idVarKey] || 1, value => { db[idVarKey] = Math.max(0, value); }, 0);
+      else addNumberInput(`${labelPrefix}ID`, db[idKey] || 1, value => { db[idKey] = Math.max(0, value); }, 0);
+    }
+
+    if (db[sourceKey] === "type") {
+      addSelect(`${labelPrefix}タイプ分類`, db[typeCategoryKey] || "weaponTypes", [
+        { value: "elements", label: "属性" },
+        { value: "weaponTypes", label: "武器タイプ" },
+        { value: "armorTypes", label: "防具タイプ" },
+        { value: "skillTypes", label: "スキルタイプ" },
+        { value: "equipTypes", label: "装備タイプ" },
+        { value: "params", label: "能力値名" }
+      ], value => { db[typeCategoryKey] = value; });
+    } else if (db[sourceKey] === "term") {
+      addSelect(`${labelPrefix}用語分類`, db[termCategoryKey] || "messages", [
+        { value: "messages", label: "メッセージ" },
+        { value: "commands", label: "コマンド名" },
+        { value: "params", label: "能力値名" },
+        { value: "basic", label: "基本語" }
+      ], value => {
+        db[termCategoryKey] = value;
+        const opts = databaseTermKeyOptions(value);
+        if (opts.length) db[termKeyKey] = opts[0].value;
+      });
+      const termOptions = databaseTermKeyOptions(db[termCategoryKey] || "messages");
+      addSelect(`${labelPrefix}用語キー`, db[termKeyKey] || termOptions[0]?.value || "", termOptions, value => { db[termKeyKey] = value; });
+    } else if (db[sourceKey] !== "gold") {
+      const optionsList = databaseFieldOptionsForSource(db[sourceKey], db[objectKey]);
+      if (optionsList.length) addSelect(`${labelPrefix}項目`, db[fieldKey] || optionsList[0].value, optionsList, value => { db[fieldKey] = value; });
+      addTextInput(`${labelPrefix}任意項目パス`, db[fieldKey] || "", value => { db[fieldKey] = value; }, "例: meta.myTag / params[2]");
+    }
+
+    if (mode === "text") {
+      addTextInput("接頭辞", db.textPrefix || "", value => { db.textPrefix = value; });
+      addTextInput("接尾辞", db.textSuffix || "", value => { db.textSuffix = value; });
+      addTextInput("空時の表示", db.emptyText || "", value => { db.emptyText = value; });
+      addNumberInput("小数桁数(-1でそのまま)", db.decimals ?? -1, value => { db.decimals = value; }, -1);
+    }
+  }
+
   function renderItemProperties(win, item) {
     if (!win || !item) return;
 
@@ -8623,6 +8804,19 @@ ${choiceRuleStructComment()}
       addPropertyDivider("内容");
       addTextarea("表示文字", item.text || "", value => { item.text = value; });
       addNumberInput("表示幅（0で自動）", item.width || 0, value => { item.width = Math.max(0, value); });
+
+      addPropertyDivider("データベース");
+      const textDb = ensureDatabaseBinding(item);
+      addCheckbox("データベースから取得", textDb.enabled === true, value => { textDb.enabled = value; });
+      if (textDb.enabled) {
+        renderDatabaseBindingSection(item, { mode: "text" });
+        addSelect("更新タイミング", textDb.updateTiming || "autoFrame", [
+          { value: "autoFrame", label: "毎フレーム自動更新" },
+          { value: "pluginCommand", label: "プラグインコマンド更新" },
+          { value: "windowOpen", label: "ウィンドウ表示時のみ" }
+        ], value => { textDb.updateTiming = value; });
+        addInfo("pluginCommand選択時は、プラグインコマンド『RefreshDatabaseBindings』で更新できます。\n表示文字はデータベース値で上書きされます。");
+      }
 
       addPropertyDivider("文字スタイル");
       addNumberInput("文字サイズ", item.fontSize || previewDefaultFontSize(), value => { item.fontSize = Math.max(1, value); });
@@ -8697,16 +8891,33 @@ ${choiceRuleStructComment()}
       }
 
       addPropertyDivider("値");
-      addSelect("値タイプ", item.valueType || "fixed", [
-        { value: "fixed", label: "固定値" },
-        { value: "variable", label: "変数" },
-        { value: "actorHp", label: "アクターHP" },
-        { value: "actorMp", label: "アクターMP" },
-        { value: "actorTp", label: "アクターTP" }
-      ], value => { item.valueType = value; });
-      addNumberPair("固定現在値", item.value || 50, "固定最大値", item.max || 100, (a, b) => { item.value = a; item.max = Math.max(1, b); });
-      addNumberPair("現在値変数ID", item.valueVariableId || 1, "最大値変数ID", item.maxVariableId || 2, (a, b) => { item.valueVariableId = a; item.maxVariableId = b; });
-      addNumberInput("アクターID", item.actorId || 1, value => { item.actorId = Math.max(1, value); });
+      const gaugeDb = ensureDatabaseBinding(item);
+      addCheckbox("データベースから取得", gaugeDb.enabled === true, value => { gaugeDb.enabled = value; });
+      if (gaugeDb.enabled) {
+        addInfo("現在値は『現在値参照』、最大値は『最大値参照』で個別に設定できます。最大値参照が未設定のときは下のフォールバック最大値を使います。");
+        addPropertyDivider("現在値参照");
+        renderDatabaseBindingSection(item, { mode: "gauge" });
+        addPropertyDivider("最大値参照");
+        renderDatabaseBindingSection(item, { mode: "gauge", prefix: "max", labelPrefix: "最大値" });
+        addNumberInput("フォールバック最大値", gaugeDb.maxFallback || 100, value => { gaugeDb.maxFallback = Math.max(1, value); }, 1);
+        addSelect("更新タイミング", gaugeDb.updateTiming || "autoFrame", [
+          { value: "autoFrame", label: "毎フレーム自動更新" },
+          { value: "pluginCommand", label: "プラグインコマンド更新" },
+          { value: "windowOpen", label: "ウィンドウ表示時のみ" }
+        ], value => { gaugeDb.updateTiming = value; });
+        addInfo("pluginCommand選択時は、プラグインコマンド『RefreshDatabaseBindings』で更新できます。\n最大値参照のデータ元を指定しない場合はフォールバック最大値を使用します。");
+      } else {
+        addSelect("値タイプ", item.valueType || "fixed", [
+          { value: "fixed", label: "固定値" },
+          { value: "variable", label: "変数" },
+          { value: "actorHp", label: "アクターHP" },
+          { value: "actorMp", label: "アクターMP" },
+          { value: "actorTp", label: "アクターTP" }
+        ], value => { item.valueType = value; });
+        addNumberPair("固定現在値", item.value || 50, "固定最大値", item.max || 100, (a, b) => { item.value = a; item.max = Math.max(1, b); });
+        addNumberPair("現在値変数ID", item.valueVariableId || 1, "最大値変数ID", item.maxVariableId || 2, (a, b) => { item.valueVariableId = a; item.maxVariableId = b; });
+        addNumberInput("アクターID", item.actorId || 1, value => { item.actorId = Math.max(1, value); });
+      }
 
       addPropertyDivider("ラベル・色");
       addTextInput("ラベル", item.label || "", value => { item.label = value; });
@@ -12182,9 +12393,9 @@ ${choiceRuleStructComment()}
   function addItem(type, options = {}) {
     const win = requireWindow();
     const base = { type, id: uid(type), displayName: "", x: 16, y: 16, zOrder: 0, visible: true, allowOutsideWindow: false };
-    if (type === "text") Object.assign(base, { text: "テキスト", fontSize: 22, width: 180, color: "", align: "left" });
+    if (type === "text") Object.assign(base, { text: "テキスト", fontSize: 22, width: 180, color: "", align: "left", databaseBinding: createDefaultDatabaseBinding() });
     if (type === "log") Object.assign(base, createDefaultLogItem());
-    if (type === "gauge") Object.assign(base, { width: 220, height: 14, gaugeShape: "horizontal", gaugeDirection: "leftToRight", gaugeStartAngle: 0, valueType: "fixed", value: 50, max: 100, label: "", color1: "#ff6060", color2: "#ffa0a0", gaugeBackImage: createDefaultGaugeImageLayer("back"), gaugeFillImage: createDefaultGaugeImageLayer("fill"), gaugeFrontImage: createDefaultGaugeImageLayer("front") });
+    if (type === "gauge") Object.assign(base, { width: 220, height: 14, gaugeShape: "horizontal", gaugeDirection: "leftToRight", gaugeStartAngle: 0, valueType: "fixed", value: 50, max: 100, label: "", color1: "#ff6060", color2: "#ffa0a0", gaugeBackImage: createDefaultGaugeImageLayer("back"), gaugeFillImage: createDefaultGaugeImageLayer("fill"), gaugeFrontImage: createDefaultGaugeImageLayer("front"), databaseBinding: createDefaultDatabaseBinding() });
     if (type === "button") Object.assign(base, { width: 120, height: 36, text: options.text ?? "OK", buttonVisualMode: options.buttonVisualMode || "normal", commonEventId: 0, switchId: 0, variableId: 0, variableValue: 0, script: "", buttonStates: { mouseOff: createDefaultButtonState(), mouseOn: createDefaultButtonState(), press: createDefaultButtonState(), release: createDefaultButtonState() }, buttonImages: { mouseOff: createButtonImageDef(), mouseOn: createButtonImageDef(), press: createButtonImageDef(), release: createButtonImageDef() }, buttonStateEdit: "mouseOn" });
     if (type === "choiceList") Object.assign(base, createDefaultChoiceListItem(options.choiceMode || "tool"));
     if (type === "imageChoiceList") Object.assign(base, createDefaultImageChoiceListItem());
@@ -12982,7 +13193,101 @@ ${choiceRuleStructComment()}
     el.innerHTML = convertPreviewTextHtml(text, win, item, fallbackSize);
   }
 
+  function previewDatabaseIdValue(binding, prefix = "") {
+    const mode = String(binding?.[`${prefix}IdMode`] || "fixed");
+    const vars = previewVariableMap();
+    if (mode === "variable") {
+      const vid = Number(binding?.[`${prefix}IdVariableId`] || 0);
+      return Math.max(0, Number(vars.get(vid) ?? binding?.[`${prefix}Id`] ?? 0));
+    }
+    return Math.max(0, Number(binding?.[`${prefix}Id`] || 0));
+  }
+
+  function previewDbPathValue(base, path) {
+    if (base == null) return null;
+    const raw = String(path || "").trim();
+    if (!raw || raw === "self") return base;
+    const tokens = raw.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+    let cur = base;
+    for (const token of tokens) {
+      if (cur == null) return null;
+      cur = cur[token];
+    }
+    return cur;
+  }
+
+  function previewDatabaseRawValue(binding, prefix = "") {
+    const sourceType = String(binding?.[`${prefix}SourceType`] || binding?.sourceType || "actor");
+    const fieldPath = String(binding?.[`${prefix}FieldPath`] || binding?.fieldPath || "name");
+    const sourceId = previewDatabaseIdValue(binding, prefix);
+    const vars = previewVariableMap();
+    const s = previewSettings();
+    if (sourceType === "variable") {
+      const v = Number(vars.get(sourceId) ?? 0);
+      if (!fieldPath || fieldPath === "self") return v;
+      return previewDbPathValue(v, fieldPath);
+    }
+    if (sourceType === "gold") return Number(vars.get(999) ?? 12345);
+    if (sourceType === "type") return `${binding?.[`${prefix}TypeCategory`] || binding?.typeCategory || "type"}[${sourceId}]`;
+    if (sourceType === "term") return `${binding?.[`${prefix}TermCategory`] || binding?.termCategory || "term"}.${binding?.[`${prefix}TermKey`] || binding?.termKey || ""}`;
+    if (sourceType === "actor") {
+      const table = {
+        name: "アクター名",
+        nickname: "二つ名",
+        profile: "プロフィール",
+        className: "職業",
+        level: 12,
+        hp: Number(s.previewActorHp || 0),
+        mhp: Math.max(1, Number(s.previewActorMhp || 1)),
+        mp: Number(s.previewActorMp || 0),
+        mmp: Math.max(1, Number(s.previewActorMmp || 1)),
+        tp: Number(s.previewActorTp || 0),
+        maxTp: 100,
+        currentExp: 1520,
+        nextRequiredExp: 280
+      };
+      return table[fieldPath] ?? (fieldPath.startsWith("param[") ? 100 : 0);
+    }
+    if (sourceType === "enemy") {
+      const table = { name: "スライム", hp: 45, mhp: 45, mp: 12, mmp: 12, tp: 0, exp: 8, gold: 12 };
+      return table[fieldPath] ?? (fieldPath.startsWith("param[") ? 10 : 0);
+    }
+    if (sourceType === "state") {
+      const table = { name: "毒", description: "毎ターンダメージ", message1: "毒に冒された！", message2: "毒で苦しんでいる" };
+      return table[fieldPath] ?? "";
+    }
+    return fieldPath === "name" ? `${sourceType}${sourceId}` : (fieldPath.includes("description") ? "説明テキスト" : 0);
+  }
+
+  function previewDatabaseTextValue(item) {
+    const binding = ensureDatabaseBinding(item);
+    if (!binding.enabled) return null;
+    const raw = previewDatabaseRawValue(binding, "");
+    const emptyText = String(binding.emptyText || "");
+    if (raw === null || raw === undefined || raw === "") return emptyText;
+    let text = "";
+    if (typeof raw === "number") {
+      const dec = Number(binding.decimals ?? -1);
+      text = dec >= 0 ? raw.toFixed(Math.max(0, dec)) : String(raw);
+    } else if (typeof raw === "string") text = raw;
+    else {
+      try { text = JSON.stringify(raw); } catch (_) { text = String(raw); }
+    }
+    return `${String(binding.textPrefix || "")}${text}${String(binding.textSuffix || "")}`;
+  }
+
+  function previewDatabaseGaugeValues(item) {
+    const binding = ensureDatabaseBinding(item);
+    if (!binding.enabled) return null;
+    const value = Number(previewDatabaseRawValue(binding, "") || 0);
+    const hasMax = String(binding.maxSourceType || "").trim().length > 0;
+    const max = hasMax ? Number(previewDatabaseRawValue(binding, "max") || 1) : Math.max(1, Number(binding.maxFallback || 100));
+    return { value, max: Math.max(1, max) };
+  }
+
   function previewGaugeValues(item) {
+    const dbValues = previewDatabaseGaugeValues(item);
+    if (dbValues) return dbValues;
     const type = String(item.valueType || "fixed");
     const vars = previewVariableMap();
     const s = previewSettings();
