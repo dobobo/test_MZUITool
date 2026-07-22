@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.56";
+  const TOOL_VERSION = "0.4.57";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -8883,7 +8883,10 @@ ${choiceRuleStructComment()}
   function databaseFieldSelectionLabel(fieldPath, optionsList = []) {
     const value = String(fieldPath || "").trim();
     const hit = (optionsList || []).find(opt => String(opt.value) === value);
-    if (hit) return `${hit.label}（${hit.value}）`;
+    if (hit) {
+      const group = String(hit.group || "").trim();
+      return group ? `${group} / ${hit.label}` : String(hit.label || hit.value);
+    }
     if (!value) return "未選択";
     return `カスタム: ${value}`;
   }
@@ -8903,7 +8906,7 @@ ${choiceRuleStructComment()}
 
     const header = document.createElement("div");
     header.className = "image-picker-header";
-    header.innerHTML = `<strong>${escapeHtml(options.title || "項目を選択")}</strong><span>${entries.length}件</span>`;
+    header.innerHTML = `<strong>${escapeHtml(options.title || "項目を選択")}</strong><span>${escapeHtml(options.subtitle || `${entries.length}件`)}</span>`;
     const close = document.createElement("button");
     close.type = "button";
     close.textContent = "閉じる";
@@ -8915,7 +8918,7 @@ ${choiceRuleStructComment()}
     controls.className = "image-picker-controls db-picker-controls";
     const search = document.createElement("input");
     search.type = "search";
-    search.placeholder = "項目名・パスで検索";
+    search.placeholder = "種類・項目名・パスで検索";
     controls.appendChild(search);
     dialog.appendChild(controls);
 
@@ -8930,7 +8933,9 @@ ${choiceRuleStructComment()}
       const filtered = entries.filter(entry => {
         if (!q) return true;
         return String(entry.value || "").toLowerCase().includes(q)
-          || String(entry.label || "").toLowerCase().includes(q);
+          || String(entry.label || "").toLowerCase().includes(q)
+          || String(entry.group || "").toLowerCase().includes(q)
+          || String(entry.detail || "").toLowerCase().includes(q);
       });
       if (filtered.length <= 0) {
         const empty = document.createElement("div");
@@ -8944,7 +8949,10 @@ ${choiceRuleStructComment()}
         row.type = "button";
         row.className = "db-picker-row db-field-picker-row";
         if (String(entry.value) === currentValue) row.classList.add("active");
-        row.innerHTML = `<span class="db-picker-name">${escapeHtml(entry.label || entry.value || "")}</span><span class="db-picker-detail">${escapeHtml(entry.value || "")}</span>`;
+        const group = String(entry.group || "その他");
+        const detail = String(entry.detail || entry.value || "");
+        row.innerHTML = `<span class="db-picker-id">${escapeHtml(group)}</span><span class="db-picker-name">${escapeHtml(entry.label || entry.value || "")}</span><span class="db-picker-detail">${escapeHtml(detail)}</span>`;
+        row.title = `${group} / ${entry.label || ""} / ${entry.value || ""}`;
         row.addEventListener("click", () => {
           if (typeof options.onSelect === "function") options.onSelect(String(entry.value || ""), entry);
           overlay.remove();
@@ -8959,42 +8967,145 @@ ${choiceRuleStructComment()}
     setTimeout(() => search.focus(), 0);
   }
 
+  function databaseFieldOptionRows(rows) {
+    return (rows || []).map(row => {
+      if (Array.isArray(row)) {
+        const [value, label, group = "", detail = ""] = row;
+        return {
+          value: String(value || ""),
+          label: String(label || value || ""),
+          group: String(group || ""),
+          detail: String(detail || value || "")
+        };
+      }
+      return {
+        value: String(row?.value || ""),
+        label: String(row?.label || row?.value || ""),
+        group: String(row?.group || ""),
+        detail: String(row?.detail || row?.value || "")
+      };
+    });
+  }
+
+  function databaseEquipParamFieldRows(groupLabel = "装備の能力変化") {
+    return [
+      ["params[0]", "最大HPの増減", groupLabel, "params[0]"],
+      ["params[1]", "最大MPの増減", groupLabel, "params[1]"],
+      ["params[2]", "攻撃力の増減", groupLabel, "params[2]"],
+      ["params[3]", "防御力の増減", groupLabel, "params[3]"],
+      ["params[4]", "魔法力の増減", groupLabel, "params[4]"],
+      ["params[5]", "魔法防御の増減", groupLabel, "params[5]"],
+      ["params[6]", "敏捷性の増減", groupLabel, "params[6]"],
+      ["params[7]", "運の増減", groupLabel, "params[7]"]
+    ];
+  }
+
+  function databaseEnemyParamFieldRows(groupLabel = "エネミー能力値") {
+    return [
+      ["params[0]", "最大HP", groupLabel, "params[0]"],
+      ["params[1]", "最大MP", groupLabel, "params[1]"],
+      ["params[2]", "攻撃力", groupLabel, "params[2]"],
+      ["params[3]", "防御力", groupLabel, "params[3]"],
+      ["params[4]", "魔法力", groupLabel, "params[4]"],
+      ["params[5]", "魔法防御", groupLabel, "params[5]"],
+      ["params[6]", "敏捷性", groupLabel, "params[6]"],
+      ["params[7]", "運", groupLabel, "params[7]"]
+    ];
+  }
+
+  function syncDatabaseBindingFieldPath(db, sourceType, objectType, fieldKey) {
+    const optionsList = databaseFieldOptionsForSource(sourceType, objectType);
+    const current = String(db?.[fieldKey] || "").trim();
+    if (current && optionsList.some(opt => String(opt.value) === current)) return optionsList;
+    if (optionsList[0]) db[fieldKey] = optionsList[0].value;
+    else if (!current) db[fieldKey] = "name";
+    return optionsList;
+  }
+
   function databaseFieldOptionsForSource(sourceType, objectType = "item") {
     const actor = [
-      ["name", "名前"], ["nickname", "二つ名"], ["profile", "プロフィール"], ["className", "職業名"],
-      ["level", "レベル"], ["hp", "現在HP"], ["mhp", "最大HP"], ["mp", "現在MP"], ["mmp", "最大MP"], ["tp", "現在TP"], ["maxTp", "最大TP"],
-      ["currentExp", "現在経験値"], ["nextRequiredExp", "次レベル必要経験値"],
-      ["param[0]", "能力値:最大HP"], ["param[1]", "能力値:最大MP"], ["param[2]", "能力値:攻撃力"], ["param[3]", "能力値:防御力"],
-      ["param[4]", "能力値:魔法力"], ["param[5]", "能力値:魔法防御"], ["param[6]", "能力値:敏捷性"], ["param[7]", "能力値:運"],
-      ["xparam[0]", "追加能力値:命中率"], ["xparam[1]", "追加能力値:回避率"], ["xparam[2]", "追加能力値:会心率"], ["xparam[3]", "追加能力値:会心回避"],
-      ["xparam[4]", "追加能力値:魔法回避"], ["xparam[5]", "追加能力値:魔法反射"], ["xparam[6]", "追加能力値:反撃率"], ["xparam[7]", "追加能力値:HP再生"],
-      ["xparam[8]", "追加能力値:MP再生"], ["xparam[9]", "追加能力値:TP再生"],
-      ["sparam[0]", "特殊能力値:狙われ率"], ["sparam[1]", "特殊能力値:防御効果"], ["sparam[2]", "特殊能力値:回復効果"], ["sparam[3]", "特殊能力値:薬の知識"],
-      ["sparam[4]", "特殊能力値:MP消費率"], ["sparam[5]", "特殊能力値:TPチャージ率"], ["sparam[6]", "特殊能力値:物理ダメ率"], ["sparam[7]", "特殊能力値:魔法ダメ率"],
-      ["sparam[8]", "特殊能力値:床ダメ率"], ["sparam[9]", "特殊能力値:経験獲得率"]
+      ["name", "名前", "基本"], ["nickname", "二つ名", "基本"], ["profile", "プロフィール", "基本"], ["className", "職業名", "基本"],
+      ["level", "レベル", "成長"], ["hp", "現在HP", "戦闘中ステータス"], ["mhp", "最大HP", "戦闘中ステータス"], ["mp", "現在MP", "戦闘中ステータス"], ["mmp", "最大MP", "戦闘中ステータス"], ["tp", "現在TP", "戦闘中ステータス"], ["maxTp", "最大TP", "戦闘中ステータス"],
+      ["currentExp", "現在経験値", "成長"], ["nextRequiredExp", "次のレベルに必要な経験値", "成長"],
+      ["param[0]", "最大HP", "能力値"], ["param[1]", "最大MP", "能力値"], ["param[2]", "攻撃力", "能力値"], ["param[3]", "防御力", "能力値"],
+      ["param[4]", "魔法力", "能力値"], ["param[5]", "魔法防御", "能力値"], ["param[6]", "敏捷性", "能力値"], ["param[7]", "運", "能力値"],
+      ["xparam[0]", "命中率", "追加能力値"], ["xparam[1]", "回避率", "追加能力値"], ["xparam[2]", "会心率", "追加能力値"], ["xparam[3]", "会心回避率", "追加能力値"],
+      ["xparam[4]", "魔法回避率", "追加能力値"], ["xparam[5]", "魔法反射率", "追加能力値"], ["xparam[6]", "反撃率", "追加能力値"], ["xparam[7]", "HP再生率", "追加能力値"],
+      ["xparam[8]", "MP再生率", "追加能力値"], ["xparam[9]", "TP再生率", "追加能力値"],
+      ["sparam[0]", "狙われ率", "特殊能力値"], ["sparam[1]", "防御効果率", "特殊能力値"], ["sparam[2]", "回復効果率", "特殊能力値"], ["sparam[3]", "薬の知識", "特殊能力値"],
+      ["sparam[4]", "MP消費率", "特殊能力値"], ["sparam[5]", "TPチャージ率", "特殊能力値"], ["sparam[6]", "物理ダメージ率", "特殊能力値"], ["sparam[7]", "魔法ダメージ率", "特殊能力値"],
+      ["sparam[8]", "床ダメージ率", "特殊能力値"], ["sparam[9]", "経験獲得率", "特殊能力値"]
     ];
-    const commonObj = [
-      ["name", "名前"], ["description", "説明"], ["iconIndex", "アイコン番号"], ["note", "メモ"],
-      ["meta", "メタ情報(JSON)"], ["params[0]", "params[0]"], ["params[1]", "params[1]"], ["params[2]", "params[2]"], ["params[3]", "params[3]"],
-      ["params[4]", "params[4]"], ["params[5]", "params[5]"], ["params[6]", "params[6]"], ["params[7]", "params[7]"]
+    const itemBase = [
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"],
+      ["price", "価格", "基本"], ["consumable", "消耗するか", "基本"], ["itypeId", "アイテムタイプID", "基本"],
+      ["scope", "効果範囲", "使用効果"], ["occasion", "使用可能時", "使用効果"], ["speed", "速度補正", "使用効果"],
+      ["successRate", "成功率", "使用効果"], ["repeats", "連続回数", "使用効果"], ["tpGain", "得TP", "使用効果"],
+      ["hitType", "命中タイプ", "使用効果"], ["animationId", "アニメーションID", "使用効果"],
+      ["damage.type", "ダメージタイプ", "ダメージ"], ["damage.elementId", "ダメージ属性ID", "ダメージ"],
+      ["damage.formula", "ダメージ計算式", "ダメージ"], ["damage.variance", "ダメージ分散度", "ダメージ"], ["damage.critical", "会心あり", "ダメージ"],
+      ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
     ];
-    const enemy = [["name", "名前"], ["hp", "現在HP(戦闘中)"], ["mhp", "最大HP"], ["mp", "現在MP(戦闘中)"], ["mmp", "最大MP"], ["tp", "現在TP(戦闘中)"], ["exp", "経験値"], ["gold", "所持金"], ...commonObj.filter(([k]) => k.startsWith("params["))];
-    const state = [["name", "名前"], ["description", "説明"], ["message1", "付与メッセージ"], ["message2", "継続メッセージ"], ["message3", "解除メッセージ"], ["message4", "味方解除メッセージ"], ["iconIndex", "アイコン番号"], ["priority", "優先度"], ["note", "メモ"], ["meta", "メタ情報(JSON)"]];
+    const skill = [
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"],
+      ["stypeId", "スキルタイプID", "基本"], ["mpCost", "消費MP", "コスト"], ["tpCost", "消費TP", "コスト"],
+      ["scope", "効果範囲", "使用効果"], ["occasion", "使用可能時", "使用効果"], ["speed", "速度補正", "使用効果"],
+      ["successRate", "成功率", "使用効果"], ["repeats", "連続回数", "使用効果"], ["tpGain", "得TP", "使用効果"],
+      ["hitType", "命中タイプ", "使用効果"], ["animationId", "アニメーションID", "使用効果"],
+      ["requiredWtypeId1", "必要武器タイプ1", "条件"], ["requiredWtypeId2", "必要武器タイプ2", "条件"],
+      ["message1", "使用メッセージ1", "メッセージ"], ["message2", "使用メッセージ2", "メッセージ"],
+      ["damage.type", "ダメージタイプ", "ダメージ"], ["damage.elementId", "ダメージ属性ID", "ダメージ"],
+      ["damage.formula", "ダメージ計算式", "ダメージ"], ["damage.variance", "ダメージ分散度", "ダメージ"], ["damage.critical", "会心あり", "ダメージ"],
+      ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
+    ];
+    const weapon = [
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"],
+      ["price", "価格", "基本"], ["etypeId", "装備タイプID", "基本"], ["wtypeId", "武器タイプID", "基本"],
+      ["animationId", "攻撃アニメーションID", "基本"],
+      ...databaseEquipParamFieldRows("装備の能力変化"),
+      ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
+    ];
+    const armor = [
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"],
+      ["price", "価格", "基本"], ["etypeId", "装備タイプID", "基本"], ["atypeId", "防具タイプID", "基本"],
+      ...databaseEquipParamFieldRows("装備の能力変化"),
+      ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
+    ];
+    const enemy = [
+      ["name", "名前", "基本"],
+      ["hp", "現在HP(戦闘中)", "戦闘中ステータス"], ["mhp", "最大HP", "戦闘中ステータス"],
+      ["mp", "現在MP(戦闘中)", "戦闘中ステータス"], ["mmp", "最大MP", "戦闘中ステータス"], ["tp", "現在TP(戦闘中)", "戦闘中ステータス"],
+      ["exp", "経験値", "報酬"], ["gold", "所持金", "報酬"],
+      ...databaseEnemyParamFieldRows("データベース能力値"),
+      ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
+    ];
+    const stateRows = [
+      ["name", "名前", "基本"], ["description", "説明", "基本"], ["iconIndex", "アイコン番号", "基本"], ["priority", "優先度", "基本"],
+      ["message1", "付与メッセージ", "メッセージ"], ["message2", "継続メッセージ", "メッセージ"],
+      ["message3", "解除メッセージ", "メッセージ"], ["message4", "味方解除メッセージ", "メッセージ"],
+      ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
+    ];
+    const classRows = [
+      ["name", "名前", "基本"],
+      ["expParams", "経験値曲線(JSON)", "成長"],
+      ["params", "レベル別能力値テーブル(JSON)", "成長"],
+      ["learnings", "習得スキル一覧(JSON)", "成長"],
+      ["note", "メモ", "メモ"], ["meta", "メモタグ(JSON)", "メモ"]
+    ];
     const bySource = {
       actor,
-      variable: [["self", "変数の値"], ["toString", "文字列化" ]],
+      variable: [["self", "変数の値", "変数"], ["toString", "文字列化", "変数"]],
       enemy,
-      state,
-      item: commonObj,
-      weapon: commonObj,
-      armor: commonObj,
-      skill: commonObj,
-      class: [["name", "名前"], ["note", "メモ"], ["params", "成長テーブル(JSON)"]],
-      databaseObject: commonObj
+      state: stateRows,
+      item: itemBase,
+      weapon,
+      armor,
+      skill,
+      class: classRows
     };
     const src = sourceType === "databaseObject" ? String(objectType || "item") : String(sourceType || "actor");
-    const rows = bySource[src] || [["name", "名前"], ["self", "全体(JSON)"]];
-    return rows.map(([value, label]) => ({ value, label }));
+    const rows = bySource[src] || [["name", "名前", "基本"], ["self", "全体(JSON)", "その他"]];
+    return databaseFieldOptionRows(rows);
   }
 
   function databaseTermKeyOptions(category) {
@@ -9034,7 +9145,10 @@ ${choiceRuleStructComment()}
       { value: "gold", label: "所持金" }
     ];
     if (prefix === "max") sourceOptions.unshift({ value: "", label: "未指定（フォールバック最大値を使用）" });
-    addSelect(`${labelPrefix}データ元`, (prefix === "max" ? (db[sourceKey] ?? "") : (db[sourceKey] || "actor")), sourceOptions, value => { db[sourceKey] = value; });
+    addSelect(`${labelPrefix}データ元`, (prefix === "max" ? (db[sourceKey] ?? "") : (db[sourceKey] || "actor")), sourceOptions, value => {
+      db[sourceKey] = value;
+      syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
+    });
 
     if (db[sourceKey] === "databaseObject") {
       addSelect(`${labelPrefix}データ種別`, db[objectKey] || "item", [
@@ -9043,7 +9157,10 @@ ${choiceRuleStructComment()}
         { value: "armor", label: "防具" },
         { value: "skill", label: "スキル" },
         { value: "class", label: "職業" }
-      ], value => { db[objectKey] = value; });
+      ], value => {
+        db[objectKey] = value;
+        syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
+      });
     }
 
     if (!["gold", "term"].includes(String(db[sourceKey]))) {
@@ -9110,13 +9227,14 @@ ${choiceRuleStructComment()}
       const termOptions = databaseTermKeyOptions(db[termCategoryKey] || "messages");
       addSelect(`${labelPrefix}用語キー`, db[termKeyKey] || termOptions[0]?.value || "", termOptions, value => { db[termKeyKey] = value; });
     } else if (db[sourceKey] !== "gold") {
-      const optionsList = databaseFieldOptionsForSource(db[sourceKey], db[objectKey]);
-      if (!String(db[fieldKey] || "").trim() && optionsList[0]) db[fieldKey] = optionsList[0].value;
+      const optionsList = syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
+      const kindLabel = db[sourceKey] === "databaseObject" ? (db[objectKey] || "item") : (db[sourceKey] || "actor");
       addReadonly(`${labelPrefix}選択中の項目`, databaseFieldSelectionLabel(db[fieldKey], optionsList));
       if (optionsList.length) {
         addButtonControl(`${labelPrefix}項目を一覧から選択`, () => {
           openDatabaseFieldPicker({
             title: `${labelPrefix}項目を選択`.trim() || "項目を選択",
+            subtitle: `${kindLabel}向けの参照項目（${optionsList.length}件）`,
             options: optionsList,
             currentValue: db[fieldKey] || "",
             onSelect: (value) => {
@@ -9127,7 +9245,7 @@ ${choiceRuleStructComment()}
           });
         });
       }
-      addTextInput(`${labelPrefix}任意項目パス`, db[fieldKey] || "", value => { db[fieldKey] = value; }, "例: meta.myTag / params[2]");
+      addTextInput(`${labelPrefix}任意項目パス`, db[fieldKey] || "", value => { db[fieldKey] = value; }, "例: meta.myTag / damage.formula");
     }
 
     if (mode === "text") {
