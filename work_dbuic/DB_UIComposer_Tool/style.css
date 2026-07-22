@@ -2030,6 +2030,16 @@ body.panel-resizing * {
   margin-top: 8px;
 }
 
+.property-subheader {
+  margin: 12px 0 4px;
+  padding: 6px 8px;
+  border-left: 3px solid rgba(122, 162, 247, 0.85);
+  background: rgba(122, 162, 247, 0.10);
+  color: rgba(235, 241, 255, 0.95);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 
 /* v0.2.92: group foundation */
 .object-list-toolbar {

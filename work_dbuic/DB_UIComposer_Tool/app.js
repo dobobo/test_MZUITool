@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.57";
+  const TOOL_VERSION = "0.4.58";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -8315,7 +8315,15 @@ ${choiceRuleStructComment()}
   }
 
   function shouldOpenPropertySection(title) {
-    return /基本|内容|配置|サイズ|画像設定|見た目/.test(String(title || ""));
+    return /基本|内容|配置|サイズ|画像設定|見た目|値|データベース/.test(String(title || ""));
+  }
+
+  function addPropertySubheader(text) {
+    const div = document.createElement("div");
+    div.className = "property-subheader";
+    setHoverHelp(div, text);
+    div.textContent = text;
+    appendPropertyControl(div);
   }
 
   function currentPropertyTargetKey() {
@@ -9147,8 +9155,14 @@ ${choiceRuleStructComment()}
     if (prefix === "max") sourceOptions.unshift({ value: "", label: "未指定（フォールバック最大値を使用）" });
     addSelect(`${labelPrefix}データ元`, (prefix === "max" ? (db[sourceKey] ?? "") : (db[sourceKey] || "actor")), sourceOptions, value => {
       db[sourceKey] = value;
-      syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
+      if (String(value || "").trim()) syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
     });
+
+    // 最大値参照は未指定のとき、以降のID/項目UIを出さない（フォールバック最大値を使う）
+    if (prefix === "max" && !String(db[sourceKey] || "").trim()) {
+      addInfo("最大値参照は未設定です。下のフォールバック最大値を使用します。");
+      return;
+    }
 
     if (db[sourceKey] === "databaseObject") {
       addSelect(`${labelPrefix}データ種別`, db[objectKey] || "item", [
@@ -9388,10 +9402,11 @@ ${choiceRuleStructComment()}
       const gaugeDb = ensureDatabaseBinding(item);
       addCheckbox("データベースから取得", gaugeDb.enabled === true, value => { gaugeDb.enabled = value; });
       if (gaugeDb.enabled) {
-        addInfo("現在値は『現在値参照』、最大値は『最大値参照』で個別に設定できます。最大値参照が未設定のときは下のフォールバック最大値を使います。");
-        addPropertyDivider("現在値参照");
+        addInfo("現在値と最大値は下で個別に設定できます。最大値参照が未設定のときはフォールバック最大値を使います。");
+        // 折りたたみ見出しを分けると『値』内に設定が無く見えるため、同一セクション内に出す
+        addPropertySubheader("現在値参照");
         renderDatabaseBindingSection(item, { mode: "gauge" });
-        addPropertyDivider("最大値参照");
+        addPropertySubheader("最大値参照");
         renderDatabaseBindingSection(item, { mode: "gauge", prefix: "max", labelPrefix: "最大値" });
         addNumberInput("フォールバック最大値", gaugeDb.maxFallback || 100, value => { gaugeDb.maxFallback = Math.max(1, value); }, 1);
         addSelect("更新タイミング", gaugeDb.updateTiming || "autoFrame", [
