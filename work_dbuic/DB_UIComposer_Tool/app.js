@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.62";
+  const TOOL_VERSION = "0.4.61";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -6591,18 +6591,22 @@
       input.addEventListener("input", () => { draft.text = input.value; });
       appendRuntimeLabel(panel, "変更後の文字", input, "\V[1]などのMZ制御文字も指定できます。");
     } else if (draft.action === "SetItemImage") {
+      const row = document.createElement("div");
+      row.className = "db-picker-field";
+      const title = document.createElement("div");
+      title.className = "db-picker-field-title";
+      title.textContent = "変更後の画像";
+      const pathRow = document.createElement("div");
+      pathRow.className = "db-picker-field-row";
       const path = document.createElement("input");
       path.disabled = true;
       path.value = `MZ画像パス: ${normalizeImageFolder(draft.image.folder) || "pictures"}/${draft.image.fileName || "未指定"}`;
-      appendRuntimeLabel(panel, "変更後の画像", path, "選択した画像のfolder/fileNameを使って、ゲーム中に画像パーツを差し替えます。");
-      const pick = document.createElement("button");
-      pick.type = "button";
-      pick.textContent = "変更画像を選択";
-      setHoverHelp(pick, "変更画像を選択", "ツクールプロジェクト読込済みの画像一覧から、ゲーム中に差し替える画像を選択します。");
-      pick.addEventListener("click", () => {
-        openProjectImagePicker(draft.image);
-      });
-      panel.appendChild(pick);
+      setHoverHelp(row, "変更後の画像", "選択した画像のfolder/fileNameを使って、ゲーム中に画像パーツを差し替えます。");
+      pathRow.appendChild(path);
+      pathRow.appendChild(createPicturePickerIconButton("変更画像を選択", () => openProjectImagePicker(draft.image)));
+      row.appendChild(title);
+      row.appendChild(pathRow);
+      panel.appendChild(row);
     } else if (draft.action === "SetCompositeImageSet") {
       const note = document.createElement("div");
       note.className = "runtime-command-note";
