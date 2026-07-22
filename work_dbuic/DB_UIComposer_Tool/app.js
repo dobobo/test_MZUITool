@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.60";
+  const TOOL_VERSION = "0.4.61";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -9343,36 +9343,51 @@ ${choiceRuleStructComment()}
       ], value => { db[idModeKey] = value; });
       const pickerKind = databasePickerKindFromBinding(db[sourceKey], db[objectKey], db[typeCategoryKey]);
       if (db[idModeKey] === "variable") {
-        addReadonly(`${labelPrefix}選択中のID変数`, databasePickerSelectionLabel("variable", Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1));
-        addNumberInput(`${labelPrefix}ID変数`, Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1, value => { db[idVarKey] = Math.max(0, value); }, 0);
-        addButtonControl(`${labelPrefix}変数を一覧から選択`, () => {
-          openDatabaseIdPicker({
-            kind: "variable",
-            title: "ID変数を選択",
-            currentId: Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1,
-            onSelect: (id) => {
-              runStateMutation(`${labelPrefix}ID変数選択`, () => {
-                db[idVarKey] = Math.max(0, Number(id) || 0);
-              });
-            }
-          });
-        });
-      } else {
-        addReadonly(`${labelPrefix}選択中`, pickerKind ? databasePickerSelectionLabel(pickerKind, Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1) : `ID ${Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1}`);
-        addNumberInput(`${labelPrefix}ID`, Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1, value => { db[idKey] = Math.max(0, value); }, 0);
-        if (pickerKind) {
-          addButtonControl(`${labelPrefix}一覧から選択`, () => {
+        addReadonlyWithDatabasePicker(
+          `${labelPrefix}選択中のID変数`,
+          databasePickerSelectionLabel("variable", Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1),
+          () => {
             openDatabaseIdPicker({
-              kind: pickerKind,
-              title: databasePickerTitle(pickerKind),
-              currentId: Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1,
+              kind: "variable",
+              title: "ID変数を選択",
+              currentId: Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1,
               onSelect: (id) => {
-                runStateMutation(`${labelPrefix}ID選択`, () => {
-                  db[idKey] = Math.max(0, Number(id) || 0);
+                runStateMutation(`${labelPrefix}ID変数選択`, () => {
+                  db[idVarKey] = Math.max(0, Number(id) || 0);
                 });
               }
             });
+          }
+        );
+        addNumberInput(`${labelPrefix}ID変数`, Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1, value => { db[idVarKey] = Math.max(0, value); }, 0);
+      } else {
+        const pickId = pickerKind ? () => {
+          openDatabaseIdPicker({
+            kind: pickerKind,
+            title: databasePickerTitle(pickerKind),
+            currentId: Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1,
+            onSelect: (id) => {
+              runStateMutation(`${labelPrefix}ID選択`, () => {
+                db[idKey] = Math.max(0, Number(id) || 0);
+              });
+            }
           });
+        } : null;
+        addReadonlyWithDatabasePicker(
+          `${labelPrefix}選択中`,
+          pickerKind ? databasePickerSelectionLabel(pickerKind, Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1) : `ID ${Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1}`,
+          pickId
+        );
+        if (pickId) {
+          addNumberInputWithDatabasePicker(
+            `${labelPrefix}ID`,
+            Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1,
+            value => { db[idKey] = Math.max(0, value); },
+            pickId,
+            0
+          );
+        } else {
+          addNumberInput(`${labelPrefix}ID`, Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1, value => { db[idKey] = Math.max(0, value); }, 0);
         }
       }
     }
@@ -9405,39 +9420,44 @@ ${choiceRuleStructComment()}
       }
       const currentTerm = String(db[termKeyKey] || termOptions[0]?.value || "");
       const termLabel = termOptions.find(opt => String(opt.value) === currentTerm);
-      addReadonly(`${labelPrefix}選択中の用語`, termLabel ? `${termLabel.label}` : (currentTerm || "未選択"));
-      addButtonControl(`${labelPrefix}用語を一覧から選択`, () => {
-        openDatabaseFieldPicker({
-          title: `${labelPrefix}用語を選択`.trim() || "用語を選択",
-          subtitle: `${db[termCategoryKey] || "messages"}（${termOptions.length}件）`,
-          options: termOptions,
-          currentValue: currentTerm,
-          onSelect: (value) => {
-            runStateMutation(`${labelPrefix}用語選択`, () => {
-              db[termKeyKey] = String(value || "");
-            });
-          }
-        });
-      });
-    } else if (db[sourceKey] !== "gold") {
-      const optionsList = syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
-      const kindLabel = db[sourceKey] === "databaseObject" ? (db[objectKey] || "item") : (db[sourceKey] || "actor");
-      addReadonly(`${labelPrefix}選択中の項目`, databaseFieldSelectionLabel(db[fieldKey], optionsList));
-      if (optionsList.length) {
-        addButtonControl(`${labelPrefix}項目を一覧から選択`, () => {
+      addReadonlyWithDatabasePicker(
+        `${labelPrefix}選択中の用語`,
+        termLabel ? `${termLabel.label}` : (currentTerm || "未選択"),
+        () => {
           openDatabaseFieldPicker({
-            title: `${labelPrefix}項目を選択`.trim() || "項目を選択",
-            subtitle: `${kindLabel}向けの参照項目（${optionsList.length}件）`,
-            options: optionsList,
-            currentValue: db[fieldKey] || "",
+            title: `${labelPrefix}用語を選択`.trim() || "用語を選択",
+            subtitle: `${db[termCategoryKey] || "messages"}（${termOptions.length}件）`,
+            options: termOptions,
+            currentValue: currentTerm,
             onSelect: (value) => {
-              runStateMutation(`${labelPrefix}項目選択`, () => {
-                db[fieldKey] = String(value || "");
+              runStateMutation(`${labelPrefix}用語選択`, () => {
+                db[termKeyKey] = String(value || "");
               });
             }
           });
+        }
+      );
+    } else if (db[sourceKey] !== "gold") {
+      const optionsList = syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
+      const kindLabel = db[sourceKey] === "databaseObject" ? (db[objectKey] || "item") : (db[sourceKey] || "actor");
+      const pickField = optionsList.length ? () => {
+        openDatabaseFieldPicker({
+          title: `${labelPrefix}項目を選択`.trim() || "項目を選択",
+          subtitle: `${kindLabel}向けの参照項目（${optionsList.length}件）`,
+          options: optionsList,
+          currentValue: db[fieldKey] || "",
+          onSelect: (value) => {
+            runStateMutation(`${labelPrefix}項目選択`, () => {
+              db[fieldKey] = String(value || "");
+            });
+          }
         });
-      }
+      } : null;
+      addReadonlyWithDatabasePicker(
+        `${labelPrefix}選択中の項目`,
+        databaseFieldSelectionLabel(db[fieldKey], optionsList),
+        pickField
+      );
       addTextInput(`${labelPrefix}任意項目パス`, db[fieldKey] || "", value => { db[fieldKey] = value; }, "例: meta.myTag / damage.formula");
     }
 
@@ -9899,6 +9919,78 @@ ${choiceRuleStructComment()}
       });
       addNumberInput("不透明度", item.opacity ?? 255, value => { item.opacity = clamp(value, 0, 255); }, 0, 255);
     }
+  }
+
+
+  function databasePickerIconSrc() {
+    return "assets/db-picker.png";
+  }
+
+  function createDatabasePickerIconButton(title, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "db-picker-icon-button";
+    setHoverHelp(button, title || "データベース一覧から選択");
+    button.title = title || "データベース一覧から選択";
+    button.setAttribute("aria-label", title || "データベース一覧から選択");
+    const img = document.createElement("img");
+    img.src = databasePickerIconSrc();
+    img.alt = "";
+    img.draggable = false;
+    button.appendChild(img);
+    button.addEventListener("click", ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof onClick === "function") onClick();
+    });
+    return button;
+  }
+
+  function addReadonlyWithDatabasePicker(label, value, onPick, help = "") {
+    const wrap = document.createElement("div");
+    wrap.className = "db-picker-field";
+    setHoverHelp(wrap, label, help || "右側のアイコンからデータベース一覧を開けます。");
+    const title = document.createElement("div");
+    title.className = "db-picker-field-title";
+    title.textContent = label;
+    const row = document.createElement("div");
+    row.className = "db-picker-field-row";
+    const input = document.createElement("input");
+    input.value = value;
+    input.disabled = true;
+    row.appendChild(input);
+    if (typeof onPick === "function") {
+      row.appendChild(createDatabasePickerIconButton(`${label}を一覧から選択`, onPick));
+    }
+    wrap.appendChild(title);
+    wrap.appendChild(row);
+    appendPropertyControl(wrap);
+  }
+
+  function addNumberInputWithDatabasePicker(label, value, onChange, onPick, min = -999999, max = 999999) {
+    const wrap = document.createElement("div");
+    wrap.className = "db-picker-field";
+    setHoverHelp(wrap, label, "右側のアイコンからデータベース一覧を開けます。");
+    const title = document.createElement("div");
+    title.className = "db-picker-field-title";
+    title.textContent = label;
+    const row = document.createElement("div");
+    row.className = "db-picker-field-row";
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = min;
+    input.max = max;
+    input.value = value;
+    input.addEventListener("change", () => {
+      runPropertyValueMutation(`${label}変更`, () => onChange(Number(input.value)));
+    });
+    row.appendChild(input);
+    if (typeof onPick === "function") {
+      row.appendChild(createDatabasePickerIconButton(`${label}を一覧から選択`, onPick));
+    }
+    wrap.appendChild(title);
+    wrap.appendChild(row);
+    appendPropertyControl(wrap);
   }
 
   function addReadonly(label, value) {
