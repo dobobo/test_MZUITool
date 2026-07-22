@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.61";
+  const TOOL_VERSION = "0.4.62";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -8651,11 +8651,10 @@ ${choiceRuleStructComment()}
     const bg = ensureWindowBackgroundImage(win);
     addPropertyDivider("背景画像");
     addCheckbox("背景画像を使う", bg.enabled === true, value => { bg.enabled = value; });
-    addButtonControl("背景画像を選択", () => openProjectImagePicker(bg));
+    addReadonlyWithPicturePicker("選択中背景", bg.fileName ? imageSelectionLabel(bg) : "未指定", () => openProjectImagePicker(bg));
     addButtonControl("背景画像を解除", () => {
       runStateMutation("背景画像を解除", () => { win.backgroundImage = createDefaultWindowBackgroundImage(); });
     });
-    addReadonly("選択中背景", bg.fileName ? imageSelectionLabel(bg) : "未指定");
     addSelect("背景表示方法", bg.mode || "stretch", ["stretch", "cover", "contain", "tile"], value => { bg.mode = value; });
     addNumberInput("背景不透明度", bg.opacity ?? 255, value => { bg.opacity = clamp(value, 0, 255); }, 0, 255);
     addNumberInput("背景表示順", bg.zOrder ?? -100, value => { bg.zOrder = Number(value) || 0; });
@@ -8663,11 +8662,10 @@ ${choiceRuleStructComment()}
     const deco = ensureWindowDecorationImage(win);
     addPropertyDivider("装飾画像");
     addCheckbox("装飾画像を使う", deco.enabled === true, value => { deco.enabled = value; });
-    addButtonControl("装飾画像を選択", () => openProjectImagePicker(deco));
+    addReadonlyWithPicturePicker("選択中装飾", deco.fileName ? imageSelectionLabel(deco) : "未指定", () => openProjectImagePicker(deco));
     addButtonControl("装飾画像を解除", () => {
       runStateMutation("装飾画像を解除", () => { win.decorationImage = createDefaultWindowDecorationImage(); });
     });
-    addReadonly("選択中装飾", deco.fileName ? imageSelectionLabel(deco) : "未指定");
     addSelect("装飾表示方法", deco.mode || "stretch", ["stretch", "cover", "contain", "tile"], value => { deco.mode = value; });
     addNumberInput("装飾不透明度", deco.opacity ?? 255, value => { deco.opacity = clamp(value, 0, 255); }, 0, 255);
     addNumberInput("装飾表示順", deco.zOrder ?? 100, value => { deco.zOrder = Number(value) || 0; });
@@ -9640,8 +9638,11 @@ ${choiceRuleStructComment()}
         const layer = ensureGaugeImageLayer(item, key, kind);
         addPropertyDivider(title);
         addCheckbox("使う", layer.enabled === true, value => { layer.enabled = value; });
-        addReadonly("選択中画像", layer.fileName ? `MZ画像パス: ${normalizeImageFolder(layer.folder)}/${layer.fileName}` : "未指定");
-        addButtonControl("画像を選択", () => openProjectImagePicker(layer, { ownerItem: item, fitOwnerSize: true }));
+        addReadonlyWithPicturePicker(
+          "選択中画像",
+          layer.fileName ? `MZ画像パス: ${normalizeImageFolder(layer.folder)}/${layer.fileName}` : "未指定",
+          () => openProjectImagePicker(layer, { ownerItem: item, fitOwnerSize: true })
+        );
         addSelect("表示方法", layer.mode || "stretch", ["stretch", "cover", "contain"], value => { layer.mode = value; });
         addNumberInput("不透明度", layer.opacity ?? 255, value => { layer.opacity = clamp(value, 0, 255); }, 0);
       };
@@ -9760,8 +9761,11 @@ ${choiceRuleStructComment()}
       const addOptImage = (label, key) => {
         const imgDef = opt[key] || (opt[key] = createImageChoiceImage());
         addPropertyDivider(label);
-        addButtonControl("画像を選択", () => openProjectImagePicker(imgDef));
-        addReadonly("選択中画像", imgDef.fileName ? imageSelectionLabel(imgDef) : "未指定");
+        addReadonlyWithPicturePicker(
+          "選択中画像",
+          imgDef.fileName ? imageSelectionLabel(imgDef) : "未指定",
+          () => openProjectImagePicker(imgDef)
+        );
         addSelect("表示方法", imgDef.mode || "stretch", ["stretch", "cover", "contain"], value => { imgDef.mode = value; });
         addNumberInput("不透明度", imgDef.opacity ?? 255, value => { imgDef.opacity = clamp(value, 0, 255); }, 0, 255);
       };
@@ -9835,8 +9839,11 @@ ${choiceRuleStructComment()}
           addReadonly("選択中名前ID", imgDef.presetId || "未指定");
           addReadonly("MZ画像パス", imgDef.fileName ? `${imgDef.folder}/${imgDef.fileName}` : "未指定");
         } else {
-          addButtonControl(`${label}画像を選択`, () => openProjectImagePicker(imgDef, { ownerItem: item, fitOwnerSize: true }));
-          addReadonly("選択中画像", imgDef.fileName ? imageSelectionLabel(imgDef) : "未指定");
+          addReadonlyWithPicturePicker(
+            "選択中画像",
+            imgDef.fileName ? imageSelectionLabel(imgDef) : "未指定",
+            () => openProjectImagePicker(imgDef, { ownerItem: item, fitOwnerSize: true })
+          );
         }
         addNumberInput(`${label}画像不透明度`, imgDef.opacity ?? 255, value => { imgDef.opacity = clamp(value, 0, 255); }, 0, 255);
       }
@@ -9904,8 +9911,7 @@ ${choiceRuleStructComment()}
       addNumberPair("基準幅", imageBaseWidth(item), "基準高さ", imageBaseHeight(item), (a, b) => { item.width = Math.max(1, a); item.height = Math.max(1, b); });
 
       addPropertyDivider("画像設定");
-      addButtonControl("プロジェクト画像から選択", () => openProjectImagePicker(item));
-      addReadonly("選択中画像", imageSelectionLabel(item));
+      addReadonlyWithPicturePicker("選択中画像", imageSelectionLabel(item), () => openProjectImagePicker(item));
 
       addPropertyDivider("画像の拡大率・不透明度");
       addNumberPair("X拡大率（%）", imageScalePercent(item, "scaleX"), "Y拡大率（%）", imageScalePercent(item, "scaleY"), (a, b) => { setImageScalePercent(item, "scaleX", a); setImageScalePercent(item, "scaleY", b); });
@@ -9987,6 +9993,51 @@ ${choiceRuleStructComment()}
     row.appendChild(input);
     if (typeof onPick === "function") {
       row.appendChild(createDatabasePickerIconButton(`${label}を一覧から選択`, onPick));
+    }
+    wrap.appendChild(title);
+    wrap.appendChild(row);
+    appendPropertyControl(wrap);
+  }
+
+  function picturePickerIconSrc() {
+    return "assets/picture-picker.png";
+  }
+
+  function createPicturePickerIconButton(title, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "db-picker-icon-button picture-picker-icon-button";
+    setHoverHelp(button, title || "ピクチャを選択");
+    button.title = title || "ピクチャを選択";
+    button.setAttribute("aria-label", title || "ピクチャを選択");
+    const img = document.createElement("img");
+    img.src = picturePickerIconSrc();
+    img.alt = "";
+    img.draggable = false;
+    button.appendChild(img);
+    button.addEventListener("click", ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof onClick === "function") onClick();
+    });
+    return button;
+  }
+
+  function addReadonlyWithPicturePicker(label, value, onPick, help = "") {
+    const wrap = document.createElement("div");
+    wrap.className = "db-picker-field";
+    setHoverHelp(wrap, label, help || "右側のアイコンからプロジェクト画像を選べます。");
+    const title = document.createElement("div");
+    title.className = "db-picker-field-title";
+    title.textContent = label;
+    const row = document.createElement("div");
+    row.className = "db-picker-field-row";
+    const input = document.createElement("input");
+    input.value = value;
+    input.disabled = true;
+    row.appendChild(input);
+    if (typeof onPick === "function") {
+      row.appendChild(createPicturePickerIconButton(label || "ピクチャを選択", onPick));
     }
     wrap.appendChild(title);
     wrap.appendChild(row);

@@ -3496,3 +3496,9 @@ body.panel-resizing * {
   display: block;
 }
 
+
+.picture-picker-icon-button img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
