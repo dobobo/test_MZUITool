@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.48";
+  const TOOL_VERSION = "0.4.49";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -13232,10 +13232,10 @@ ${choiceRuleStructComment()}
     if (sourceType === "term") return `${binding?.[`${prefix}TermCategory`] || binding?.termCategory || "term"}.${binding?.[`${prefix}TermKey`] || binding?.termKey || ""}`;
     if (sourceType === "actor") {
       const table = {
-        name: "アクター名",
-        nickname: "二つ名",
-        profile: "プロフィール",
-        className: "職業",
+        name: `アクター${Math.max(1, sourceId || 1)}`,
+        nickname: "風の旅人",
+        profile: "冒険を夢見る青年。",
+        className: "戦士",
         level: 12,
         hp: Number(s.previewActorHp || 0),
         mhp: Math.max(1, Number(s.previewActorMhp || 1)),
