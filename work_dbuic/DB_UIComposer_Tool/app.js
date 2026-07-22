@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.50";
+  const TOOL_VERSION = "0.4.51";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -279,10 +279,10 @@
     if (!["fixed", "variable"].includes(String(db.idMode || ""))) db.idMode = "fixed";
     if (!["fixed", "variable"].includes(String(db.maxIdMode || ""))) db.maxIdMode = "fixed";
     if (!["autoFrame", "pluginCommand", "windowOpen"].includes(String(db.updateTiming || ""))) db.updateTiming = "autoFrame";
-    db.id = Math.max(0, Number(db.id || 0));
-    db.idVariableId = Math.max(0, Number(db.idVariableId || 0));
-    db.maxId = Math.max(0, Number(db.maxId || 0));
-    db.maxIdVariableId = Math.max(0, Number(db.maxIdVariableId || 0));
+    db.id = Math.max(0, Number.isFinite(Number(db.id)) ? Number(db.id) : 1);
+    db.idVariableId = Math.max(0, Number.isFinite(Number(db.idVariableId)) ? Number(db.idVariableId) : 1);
+    db.maxId = Math.max(0, Number.isFinite(Number(db.maxId)) ? Number(db.maxId) : 1);
+    db.maxIdVariableId = Math.max(0, Number.isFinite(Number(db.maxIdVariableId)) ? Number(db.maxIdVariableId) : 1);
     db.decimals = Number.isFinite(Number(db.decimals)) ? Number(db.decimals) : -1;
     db.maxFallback = Math.max(1, Number(db.maxFallback || 100));
     return db;
@@ -8957,13 +8957,13 @@ ${choiceRuleStructComment()}
       ], value => { db[idModeKey] = value; });
       const pickerKind = databasePickerKindFromBinding(db[sourceKey], db[objectKey], db[typeCategoryKey]);
       if (db[idModeKey] === "variable") {
-        addReadonly(`${labelPrefix}選択中のID変数`, databasePickerSelectionLabel("variable", db[idVarKey] || 1));
-        addNumberInput(`${labelPrefix}ID変数`, db[idVarKey] || 1, value => { db[idVarKey] = Math.max(0, value); }, 0);
+        addReadonly(`${labelPrefix}選択中のID変数`, databasePickerSelectionLabel("variable", Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1));
+        addNumberInput(`${labelPrefix}ID変数`, Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1, value => { db[idVarKey] = Math.max(0, value); }, 0);
         addButtonControl(`${labelPrefix}変数を一覧から選択`, () => {
           openDatabaseIdPicker({
             kind: "variable",
             title: "ID変数を選択",
-            currentId: db[idVarKey] || 1,
+            currentId: Number.isFinite(Number(db[idVarKey])) ? Number(db[idVarKey]) : 1,
             onSelect: (id) => {
               runStateMutation(`${labelPrefix}ID変数選択`, () => {
                 db[idVarKey] = Math.max(0, Number(id) || 0);
@@ -8972,14 +8972,14 @@ ${choiceRuleStructComment()}
           });
         });
       } else {
-        addReadonly(`${labelPrefix}選択中`, pickerKind ? databasePickerSelectionLabel(pickerKind, db[idKey] || 1) : `ID ${db[idKey] || 1}`);
-        addNumberInput(`${labelPrefix}ID`, db[idKey] || 1, value => { db[idKey] = Math.max(0, value); }, 0);
+        addReadonly(`${labelPrefix}選択中`, pickerKind ? databasePickerSelectionLabel(pickerKind, Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1) : `ID ${Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1}`);
+        addNumberInput(`${labelPrefix}ID`, Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1, value => { db[idKey] = Math.max(0, value); }, 0);
         if (pickerKind) {
           addButtonControl(`${labelPrefix}一覧から選択`, () => {
             openDatabaseIdPicker({
               kind: pickerKind,
               title: databasePickerTitle(pickerKind),
-              currentId: db[idKey] || 1,
+              currentId: Number.isFinite(Number(db[idKey])) ? Number(db[idKey]) : 1,
               onSelect: (id) => {
                 runStateMutation(`${labelPrefix}ID選択`, () => {
                   db[idKey] = Math.max(0, Number(id) || 0);
@@ -13481,27 +13481,59 @@ ${choiceRuleStructComment()}
     return cur;
   }
 
+  function previewDatabaseObjectRow(row, fieldPath) {
+    if (!row || typeof row !== "object") return null;
+    const key = String(fieldPath || "name");
+    if (!key || key === "self") return row;
+    if (Object.prototype.hasOwnProperty.call(row, key)) return row[key];
+    return previewDbPathValue(row, key);
+  }
+
   function previewDatabaseRawValue(binding, prefix = "") {
     const sourceType = String(binding?.[`${prefix}SourceType`] || binding?.sourceType || "actor");
+    const objectType = String(binding?.[`${prefix}ObjectType`] || binding?.objectType || "item");
     const fieldPath = String(binding?.[`${prefix}FieldPath`] || binding?.fieldPath || "name");
     const sourceId = previewDatabaseIdValue(binding, prefix);
     const vars = previewVariableMap();
     const s = previewSettings();
+
     if (sourceType === "variable") {
       const v = Number(vars.get(sourceId) ?? 0);
       if (!fieldPath || fieldPath === "self") return v;
       return previewDbPathValue(v, fieldPath);
     }
     if (sourceType === "gold") return Number(vars.get(999) ?? 12345);
-    if (sourceType === "type") return `${binding?.[`${prefix}TypeCategory`] || binding?.typeCategory || "type"}[${sourceId}]`;
-    if (sourceType === "term") return `${binding?.[`${prefix}TermCategory`] || binding?.termCategory || "term"}.${binding?.[`${prefix}TermKey`] || binding?.termKey || ""}`;
+
+    if (sourceType === "type") {
+      const category = String(binding?.[`${prefix}TypeCategory`] || binding?.typeCategory || "weaponTypes");
+      const rows = projectSystemNamedList(category);
+      return rows[sourceId] ?? "";
+    }
+
+    if (sourceType === "term") {
+      const category = String(binding?.[`${prefix}TermCategory`] || binding?.termCategory || "messages");
+      const termKey = String(binding?.[`${prefix}TermKey`] || binding?.termKey || "");
+      const terms = projectAssets.system?.terms || {};
+      const table = terms[category];
+      if (Array.isArray(table)) {
+        const index = termKey === "" ? sourceId : Number(termKey);
+        return Number.isFinite(index) ? (table[index] ?? "") : "";
+      }
+      if (table && typeof table === "object") return table[termKey] ?? "";
+      if (category === "basic" || !category) return String(projectAssets.system?.currencyUnit || "G");
+      return "";
+    }
+
     if (sourceType === "actor") {
+      const actorId = Math.max(1, sourceId || 1);
+      const actor = projectDatabaseTable("actor")[actorId];
+      const classRow = actor ? projectDatabaseTable("class")[Number(actor.classId || 0)] : null;
       const table = {
-        name: `アクター${Math.max(1, sourceId || 1)}`,
-        nickname: "風の旅人",
-        profile: "冒険を夢見る青年。",
-        className: "戦士",
-        level: 12,
+        name: actor?.name || `アクター${actorId}`,
+        nickname: actor?.nickname || "風の旅人",
+        profile: actor?.profile || "冒険を夢見る青年。",
+        className: classRow?.name || "戦士",
+        level: Number(actor?.initialLevel || 1),
         hp: Number(s.previewActorHp || 0),
         mhp: Math.max(1, Number(s.previewActorMhp || 1)),
         mp: Number(s.previewActorMp || 0),
@@ -13511,17 +13543,45 @@ ${choiceRuleStructComment()}
         currentExp: 1520,
         nextRequiredExp: 280
       };
-      return table[fieldPath] ?? (fieldPath.startsWith("param[") ? 100 : 0);
+      if (Object.prototype.hasOwnProperty.call(table, fieldPath)) return table[fieldPath];
+      if (fieldPath.startsWith("param[")) return 100;
+      return actor ? previewDatabaseObjectProp(actor, fieldPath) : "";
     }
+
     if (sourceType === "enemy") {
+      const enemy = projectDatabaseTable("enemy")[sourceId];
+      if (enemy) {
+        if (fieldPath === "hp" || fieldPath === "mhp") return Number(enemy.params?.[0] ?? 0);
+        if (fieldPath === "mp" || fieldPath === "mmp") return Number(enemy.params?.[1] ?? 0);
+        if (fieldPath === "tp") return 0;
+        const value = previewDatabaseObjectProp(enemy, fieldPath);
+        return value == null ? "" : value;
+      }
       const table = { name: "スライム", hp: 45, mhp: 45, mp: 12, mmp: 12, tp: 0, exp: 8, gold: 12 };
-      return table[fieldPath] ?? (fieldPath.startsWith("param[") ? 10 : 0);
+      return table[fieldPath] ?? (fieldPath.startsWith("param[") ? 10 : "");
     }
+
     if (sourceType === "state") {
+      const state = projectDatabaseTable("state")[sourceId];
+      if (state) {
+        const value = previewDatabaseObjectProp(state, fieldPath);
+        return value == null ? "" : value;
+      }
       const table = { name: "毒", description: "毎ターンダメージ", message1: "毒に冒された！", message2: "毒で苦しんでいる" };
       return table[fieldPath] ?? "";
     }
-    return fieldPath === "name" ? `${sourceType}${sourceId}` : (fieldPath.includes("description") ? "説明テキスト" : 0);
+
+    const dataKind = sourceType === "databaseObject"
+      ? objectType
+      : (["item", "weapon", "armor", "skill", "class"].includes(sourceType) ? sourceType : "");
+    if (dataKind) {
+      const row = projectDatabaseTable(dataKind)[sourceId];
+      if (!row) return "";
+      const value = previewDatabaseObjectProp(row, fieldPath || "name");
+      return value == null ? "" : value;
+    }
+
+    return "";
   }
 
   function previewDatabaseTextValue(item) {
