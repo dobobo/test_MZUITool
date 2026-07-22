@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.51 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.52 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -58,6 +58,7 @@
  * v0.4.49では、アクターの名前/二つ名/プロフィール/職業名のプレビュー仮値が項目名そのものになる問題を修正しています。
  * v0.4.50では、データベースID指定を一覧選択ダイアログ化し、プロジェクトのdataから名前付きで選べるようにしています。
  * v0.4.51では、アイテム等のデータベース参照プレビューが実データを表示するよう修正し、ID=0の表示不整合も解消しています。
+ * v0.4.52では、データベース参照のIDキー解決不具合を修正し、アクター一覧選択が常にID1になる問題を解消しています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -2016,6 +2017,13 @@
     return { x, y, width: maxX, height: maxY };
   };
 
+  const databaseBindingPropKey = (prefix, baseKey) => {
+    const key = String(baseKey || "");
+    const p = String(prefix || "");
+    if (!p) return key;
+    return `${p}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+  };
+
   const normalizeDatabaseBinding = src => {
     const def = src && typeof src === "object" ? src : {};
     const norm = {
@@ -2058,9 +2066,9 @@
   };
 
   const databaseBindingIdValue = (binding, keyPrefix = "") => {
-    const idMode = String(binding?.[`${keyPrefix}IdMode`] || "fixed");
-    const fixedId = Math.max(0, toNumber(binding?.[`${keyPrefix}Id`], 0));
-    const variableId = Math.max(0, toNumber(binding?.[`${keyPrefix}IdVariableId`], 0));
+    const idMode = String(binding?.[databaseBindingPropKey(keyPrefix, "idMode")] || "fixed");
+    const fixedId = Math.max(0, toNumber(binding?.[databaseBindingPropKey(keyPrefix, "id")], 0));
+    const variableId = Math.max(0, toNumber(binding?.[databaseBindingPropKey(keyPrefix, "idVariableId")], 0));
     if (idMode === "variable" && variableId > 0) return Math.max(0, toNumber($gameVariables.value(variableId), fixedId || 0));
     return fixedId;
   };
@@ -2079,7 +2087,7 @@
   };
 
   const databaseTypeValue = (binding, keyPrefix = "") => {
-    const category = String(binding?.[`${keyPrefix}TypeCategory`] || binding?.typeCategory || "weaponTypes");
+    const category = String(binding?.[databaseBindingPropKey(keyPrefix, "typeCategory")] || binding?.typeCategory || "weaponTypes");
     const index = databaseBindingIdValue(binding, keyPrefix);
     const system = $dataSystem || {};
     const table = {
@@ -2094,8 +2102,8 @@
   };
 
   const databaseTermValue = (binding, keyPrefix = "") => {
-    const category = String(binding?.[`${keyPrefix}TermCategory`] || binding?.termCategory || "messages");
-    const key = String(binding?.[`${keyPrefix}TermKey`] || binding?.termKey || "currencyUnit");
+    const category = String(binding?.[databaseBindingPropKey(keyPrefix, "termCategory")] || binding?.termCategory || "messages");
+    const key = String(binding?.[databaseBindingPropKey(keyPrefix, "termKey")] || binding?.termKey || "currencyUnit");
     const terms = ($dataSystem && $dataSystem.terms) ? $dataSystem.terms : {};
     const table = terms[category];
     if (Array.isArray(table)) {
@@ -2184,9 +2192,9 @@
   };
 
   const databaseBindingRawValue = (binding, keyPrefix = "") => {
-    const sourceKey = keyPrefix ? `${keyPrefix}SourceType` : "sourceType";
-    const objectKey = keyPrefix ? `${keyPrefix}ObjectType` : "objectType";
-    const fieldKey = keyPrefix ? `${keyPrefix}FieldPath` : "fieldPath";
+    const sourceKey = databaseBindingPropKey(keyPrefix, "sourceType");
+    const objectKey = databaseBindingPropKey(keyPrefix, "objectType");
+    const fieldKey = databaseBindingPropKey(keyPrefix, "fieldPath");
     const sourceType = String(binding?.[sourceKey] || binding?.sourceType || "actor");
     if (sourceType === "gold") return $gameParty ? toNumber($gameParty.gold(), 0) : 0;
     if (sourceType === "type") return databaseTypeValue(binding, keyPrefix);
@@ -6043,7 +6051,7 @@
   });
 
   window.DB_UIComposer = {
-    version: "0.4.51",
+    version: "0.4.52",
     applyLayout,
     refreshScene,
     normalizeLayout,

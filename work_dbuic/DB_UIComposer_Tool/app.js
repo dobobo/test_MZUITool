@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.51";
+  const TOOL_VERSION = "0.4.52";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -269,6 +269,13 @@
       maxTermKey: "",
       maxFallback: 100
     };
+  }
+
+  function databaseBindingPropKey(prefix, baseKey) {
+    const key = String(baseKey || "");
+    const p = String(prefix || "");
+    if (!p) return key;
+    return `${p}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
   }
 
   function ensureDatabaseBinding(item) {
@@ -8917,15 +8924,15 @@ ${choiceRuleStructComment()}
     const mode = String(options.mode || "text");
     const prefix = options.prefix || "";
     const labelPrefix = options.labelPrefix || "";
-    const sourceKey = prefix ? `${prefix}SourceType` : "sourceType";
-    const objectKey = prefix ? `${prefix}ObjectType` : "objectType";
-    const idModeKey = prefix ? `${prefix}IdMode` : "idMode";
-    const idKey = prefix ? `${prefix}Id` : "id";
-    const idVarKey = prefix ? `${prefix}IdVariableId` : "idVariableId";
-    const fieldKey = prefix ? `${prefix}FieldPath` : "fieldPath";
-    const typeCategoryKey = prefix ? `${prefix}TypeCategory` : "typeCategory";
-    const termCategoryKey = prefix ? `${prefix}TermCategory` : "termCategory";
-    const termKeyKey = prefix ? `${prefix}TermKey` : "termKey";
+    const sourceKey = databaseBindingPropKey(prefix, "sourceType");
+    const objectKey = databaseBindingPropKey(prefix, "objectType");
+    const idModeKey = databaseBindingPropKey(prefix, "idMode");
+    const idKey = databaseBindingPropKey(prefix, "id");
+    const idVarKey = databaseBindingPropKey(prefix, "idVariableId");
+    const fieldKey = databaseBindingPropKey(prefix, "fieldPath");
+    const typeCategoryKey = databaseBindingPropKey(prefix, "typeCategory");
+    const termCategoryKey = databaseBindingPropKey(prefix, "termCategory");
+    const termKeyKey = databaseBindingPropKey(prefix, "termKey");
 
     const sourceOptions = [
       { value: "actor", label: "アクターデータ" },
@@ -13459,13 +13466,13 @@ ${choiceRuleStructComment()}
   }
 
   function previewDatabaseIdValue(binding, prefix = "") {
-    const mode = String(binding?.[`${prefix}IdMode`] || "fixed");
+    const mode = String(binding?.[databaseBindingPropKey(prefix, "idMode")] || "fixed");
     const vars = previewVariableMap();
     if (mode === "variable") {
-      const vid = Number(binding?.[`${prefix}IdVariableId`] || 0);
-      return Math.max(0, Number(vars.get(vid) ?? binding?.[`${prefix}Id`] ?? 0));
+      const vid = Number(binding?.[databaseBindingPropKey(prefix, "idVariableId")] || 0);
+      return Math.max(0, Number(vars.get(vid) ?? binding?.[databaseBindingPropKey(prefix, "id")] ?? 0));
     }
-    return Math.max(0, Number(binding?.[`${prefix}Id`] || 0));
+    return Math.max(0, Number(binding?.[databaseBindingPropKey(prefix, "id")] || 0));
   }
 
   function previewDbPathValue(base, path) {
@@ -13490,9 +13497,9 @@ ${choiceRuleStructComment()}
   }
 
   function previewDatabaseRawValue(binding, prefix = "") {
-    const sourceType = String(binding?.[`${prefix}SourceType`] || binding?.sourceType || "actor");
-    const objectType = String(binding?.[`${prefix}ObjectType`] || binding?.objectType || "item");
-    const fieldPath = String(binding?.[`${prefix}FieldPath`] || binding?.fieldPath || "name");
+    const sourceType = String(binding?.[databaseBindingPropKey(prefix, "sourceType")] || binding?.sourceType || "actor");
+    const objectType = String(binding?.[databaseBindingPropKey(prefix, "objectType")] || binding?.objectType || "item");
+    const fieldPath = String(binding?.[databaseBindingPropKey(prefix, "fieldPath")] || binding?.fieldPath || "name");
     const sourceId = previewDatabaseIdValue(binding, prefix);
     const vars = previewVariableMap();
     const s = previewSettings();
@@ -13505,14 +13512,14 @@ ${choiceRuleStructComment()}
     if (sourceType === "gold") return Number(vars.get(999) ?? 12345);
 
     if (sourceType === "type") {
-      const category = String(binding?.[`${prefix}TypeCategory`] || binding?.typeCategory || "weaponTypes");
+      const category = String(binding?.[databaseBindingPropKey(prefix, "typeCategory")] || binding?.typeCategory || "weaponTypes");
       const rows = projectSystemNamedList(category);
       return rows[sourceId] ?? "";
     }
 
     if (sourceType === "term") {
-      const category = String(binding?.[`${prefix}TermCategory`] || binding?.termCategory || "messages");
-      const termKey = String(binding?.[`${prefix}TermKey`] || binding?.termKey || "");
+      const category = String(binding?.[databaseBindingPropKey(prefix, "termCategory")] || binding?.termCategory || "messages");
+      const termKey = String(binding?.[databaseBindingPropKey(prefix, "termKey")] || binding?.termKey || "");
       const terms = projectAssets.system?.terms || {};
       const table = terms[category];
       if (Array.isArray(table)) {
