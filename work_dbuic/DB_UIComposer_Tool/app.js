@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.62";
+  const TOOL_VERSION = "0.4.63";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -8893,12 +8893,88 @@ ${choiceRuleStructComment()}
     setTimeout(() => search.focus(), 0);
   }
 
+  function formatDatabaseListSample(value) {
+    if (value === null || value === undefined || value === "") return "（空）";
+    if (typeof value === "boolean") return value ? "true" : "false";
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) return "（空）";
+      return String(value);
+    }
+    if (typeof value === "object") {
+      try {
+        const text = JSON.stringify(value);
+        return text.length > 48 ? `${text.slice(0, 47)}…` : text;
+      } catch (_) {
+        return String(value);
+      }
+    }
+    const text = String(value).replace(/\r?\n/g, " ").trim();
+    if (!text) return "（空）";
+    return text.length > 48 ? `${text.slice(0, 47)}…` : text;
+  }
+
+  function previewDatabaseBindingWithField(binding, fieldPath, prefix = "") {
+    const probe = Object.assign({}, binding || {});
+    const fieldKey = databaseBindingPropKey(prefix, "fieldPath");
+    probe[fieldKey] = String(fieldPath || "");
+    if (!prefix) probe.fieldPath = String(fieldPath || "");
+    return previewDatabaseRawValue(probe, prefix);
+  }
+
+  function defaultDatabaseBindingFieldSample(binding, fieldPath, prefix = "") {
+    const probe = Object.assign({}, createDefaultDatabaseBinding(), binding || {});
+    const sourceKey = databaseBindingPropKey(prefix, "sourceType");
+    const objectKey = databaseBindingPropKey(prefix, "objectType");
+    const idModeKey = databaseBindingPropKey(prefix, "idMode");
+    const idKey = databaseBindingPropKey(prefix, "id");
+    const fieldKey = databaseBindingPropKey(prefix, "fieldPath");
+    // デフォルト参照は固定ID=1（未指定時の基準）
+    probe[idModeKey] = "fixed";
+    probe[idKey] = 1;
+    if (!prefix) {
+      probe.idMode = "fixed";
+      probe.id = 1;
+    }
+    probe[fieldKey] = String(fieldPath || "");
+    if (!prefix) probe.fieldPath = String(fieldPath || "");
+    if (!String(probe[sourceKey] || "").trim() && prefix === "max") return "";
+    return previewDatabaseRawValue(probe, prefix);
+  }
+
+  function enrichDatabaseFieldPickerOptions(optionsList, binding, prefix = "") {
+    return (optionsList || []).map(opt => {
+      const fieldPath = String(opt.value || "");
+      const currentRaw = previewDatabaseBindingWithField(binding, fieldPath, prefix);
+      const defaultRaw = defaultDatabaseBindingFieldSample(binding, fieldPath, prefix);
+      return Object.assign({}, opt, {
+        currentText: formatDatabaseListSample(currentRaw),
+        defaultText: formatDatabaseListSample(defaultRaw)
+      });
+    });
+  }
+
+  function enrichDatabaseTermPickerOptions(optionsList, termCategory) {
+    const terms = projectAssets.system?.terms || {};
+    return (optionsList || []).map(opt => {
+      const key = String(opt.value || "");
+      const currentRaw = resolveDatabaseTermValue(terms, termCategory, key, 0);
+      // デフォルトは項目ラベル（標準名称）。プロジェクトで変えていても元の意味が分かるようにする。
+      const defaultRaw = String(opt.label || key || "");
+      return Object.assign({}, opt, {
+        currentText: formatDatabaseListSample(currentRaw),
+        defaultText: formatDatabaseListSample(defaultRaw)
+      });
+    });
+  }
+
   function databaseFieldSelectionLabel(fieldPath, optionsList = []) {
     const value = String(fieldPath || "").trim();
     const hit = (optionsList || []).find(opt => String(opt.value) === value);
     if (hit) {
       const group = String(hit.group || "").trim();
-      return group ? `${group} / ${hit.label}` : String(hit.label || hit.value);
+      const base = group ? `${group} / ${hit.label}` : String(hit.label || hit.value);
+      if (hit.currentText) return `${base}　現在:${hit.currentText}`;
+      return base;
     }
     if (!value) return "未選択";
     return `カスタム: ${value}`;
@@ -8914,7 +8990,7 @@ ${choiceRuleStructComment()}
     const overlay = document.createElement("div");
     overlay.className = "image-picker-overlay db-picker-overlay";
     const dialog = document.createElement("div");
-    dialog.className = "image-picker-dialog db-picker-dialog";
+    dialog.className = "image-picker-dialog db-picker-dialog db-field-picker-dialog";
     overlay.appendChild(dialog);
 
     const header = document.createElement("div");
@@ -8927,11 +9003,16 @@ ${choiceRuleStructComment()}
     header.appendChild(close);
     dialog.appendChild(header);
 
+    const legend = document.createElement("div");
+    legend.className = "db-field-picker-legend";
+    legend.textContent = "現在 = 選択中IDのプレビュー値 / デフォルト = ID1（基準）または標準名称";
+    dialog.appendChild(legend);
+
     const controls = document.createElement("div");
     controls.className = "image-picker-controls db-picker-controls";
     const search = document.createElement("input");
     search.type = "search";
-    search.placeholder = "種類・項目名・パスで検索";
+    search.placeholder = "種類・項目名・現在値・デフォルト値で検索";
     controls.appendChild(search);
     dialog.appendChild(controls);
 
@@ -8948,7 +9029,9 @@ ${choiceRuleStructComment()}
         return String(entry.value || "").toLowerCase().includes(q)
           || String(entry.label || "").toLowerCase().includes(q)
           || String(entry.group || "").toLowerCase().includes(q)
-          || String(entry.detail || "").toLowerCase().includes(q);
+          || String(entry.detail || "").toLowerCase().includes(q)
+          || String(entry.currentText || "").toLowerCase().includes(q)
+          || String(entry.defaultText || "").toLowerCase().includes(q);
       });
       if (filtered.length <= 0) {
         const empty = document.createElement("div");
@@ -8963,9 +9046,17 @@ ${choiceRuleStructComment()}
         row.className = "db-picker-row db-field-picker-row";
         if (String(entry.value) === currentValue) row.classList.add("active");
         const group = String(entry.group || "その他");
-        const detail = String(entry.detail || entry.value || "");
-        row.innerHTML = `<span class="db-picker-id">${escapeHtml(group)}</span><span class="db-picker-name">${escapeHtml(entry.label || entry.value || "")}</span><span class="db-picker-detail">${escapeHtml(detail)}</span>`;
-        row.title = `${group} / ${entry.label || ""} / ${entry.value || ""}`;
+        const currentText = String(entry.currentText || "（空）");
+        const defaultText = String(entry.defaultText || "（空）");
+        row.innerHTML = `
+          <span class="db-picker-id">${escapeHtml(group)}</span>
+          <span class="db-picker-name">${escapeHtml(entry.label || entry.value || "")}</span>
+          <span class="db-picker-values">
+            <span class="db-picker-value-current"><em>現在</em>${escapeHtml(currentText)}</span>
+            <span class="db-picker-value-default"><em>デフォルト</em>${escapeHtml(defaultText)}</span>
+          </span>
+        `;
+        row.title = `${group} / ${entry.label || ""} / 現在:${currentText} / デフォルト:${defaultText}`;
         row.addEventListener("click", () => {
           if (typeof options.onSelect === "function") options.onSelect(String(entry.value || ""), entry);
           overlay.remove();
@@ -9420,16 +9511,19 @@ ${choiceRuleStructComment()}
         const idx = resolveDatabaseTermArrayIndex("commands", db[termKeyKey], 0);
         if (idx >= 0) db[termKeyKey] = String(idx);
       }
-      const currentTerm = String(db[termKeyKey] || termOptions[0]?.value || "");
-      const termLabel = termOptions.find(opt => String(opt.value) === currentTerm);
+      const enrichedTerms = enrichDatabaseTermPickerOptions(termOptions, db[termCategoryKey] || "messages");
+      const currentTerm = String(db[termKeyKey] || enrichedTerms[0]?.value || "");
+      const termLabel = enrichedTerms.find(opt => String(opt.value) === currentTerm);
       addReadonlyWithDatabasePicker(
         `${labelPrefix}選択中の用語`,
-        termLabel ? `${termLabel.label}` : (currentTerm || "未選択"),
+        termLabel
+          ? `${termLabel.label}　現在:${termLabel.currentText || "（空）"}`
+          : (currentTerm || "未選択"),
         () => {
           openDatabaseFieldPicker({
             title: `${labelPrefix}用語を選択`.trim() || "用語を選択",
-            subtitle: `${db[termCategoryKey] || "messages"}（${termOptions.length}件）`,
-            options: termOptions,
+            subtitle: `${db[termCategoryKey] || "messages"}（${enrichedTerms.length}件）`,
+            options: enrichedTerms,
             currentValue: currentTerm,
             onSelect: (value) => {
               runStateMutation(`${labelPrefix}用語選択`, () => {
@@ -9441,12 +9535,13 @@ ${choiceRuleStructComment()}
       );
     } else if (db[sourceKey] !== "gold") {
       const optionsList = syncDatabaseBindingFieldPath(db, db[sourceKey], db[objectKey], fieldKey);
+      const enrichedFields = enrichDatabaseFieldPickerOptions(optionsList, db, prefix);
       const kindLabel = db[sourceKey] === "databaseObject" ? (db[objectKey] || "item") : (db[sourceKey] || "actor");
-      const pickField = optionsList.length ? () => {
+      const pickField = enrichedFields.length ? () => {
         openDatabaseFieldPicker({
           title: `${labelPrefix}項目を選択`.trim() || "項目を選択",
-          subtitle: `${kindLabel}向けの参照項目（${optionsList.length}件）`,
-          options: optionsList,
+          subtitle: `${kindLabel}向けの参照項目（${enrichedFields.length}件）`,
+          options: enrichedFields,
           currentValue: db[fieldKey] || "",
           onSelect: (value) => {
             runStateMutation(`${labelPrefix}項目選択`, () => {
@@ -9457,7 +9552,7 @@ ${choiceRuleStructComment()}
       } : null;
       addReadonlyWithDatabasePicker(
         `${labelPrefix}選択中の項目`,
-        databaseFieldSelectionLabel(db[fieldKey], optionsList),
+        databaseFieldSelectionLabel(db[fieldKey], enrichedFields),
         pickField
       );
       addTextInput(`${labelPrefix}任意項目パス`, db[fieldKey] || "", value => { db[fieldKey] = value; }, "例: meta.myTag / damage.formula");

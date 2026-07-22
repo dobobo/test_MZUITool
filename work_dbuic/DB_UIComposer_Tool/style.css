@@ -3435,8 +3435,50 @@ body.panel-resizing * {
   font-weight: 600;
 }
 
+.db-field-picker-dialog {
+  width: min(920px, calc(100vw - 48px));
+}
+
+.db-field-picker-legend {
+  padding: 0 14px 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .db-field-picker-row {
-  grid-template-columns: minmax(110px, 0.8fr) minmax(160px, 1.2fr) minmax(120px, 0.9fr);
+  grid-template-columns: minmax(96px, 0.7fr) minmax(140px, 1fr) minmax(220px, 1.4fr);
+  align-items: start;
+}
+
+.db-picker-values {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.db-picker-value-current,
+.db-picker-value-default {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 6px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.db-picker-value-current em,
+.db-picker-value-default em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.db-picker-value-current,
+.db-picker-value-default {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .db-picker-detail {
