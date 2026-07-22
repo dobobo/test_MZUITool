@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.63";
+  const TOOL_VERSION = "0.4.64";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -8921,34 +8921,15 @@ ${choiceRuleStructComment()}
     return previewDatabaseRawValue(probe, prefix);
   }
 
-  function defaultDatabaseBindingFieldSample(binding, fieldPath, prefix = "") {
-    const probe = Object.assign({}, createDefaultDatabaseBinding(), binding || {});
-    const sourceKey = databaseBindingPropKey(prefix, "sourceType");
-    const objectKey = databaseBindingPropKey(prefix, "objectType");
-    const idModeKey = databaseBindingPropKey(prefix, "idMode");
-    const idKey = databaseBindingPropKey(prefix, "id");
-    const fieldKey = databaseBindingPropKey(prefix, "fieldPath");
-    // デフォルト参照は固定ID=1（未指定時の基準）
-    probe[idModeKey] = "fixed";
-    probe[idKey] = 1;
-    if (!prefix) {
-      probe.idMode = "fixed";
-      probe.id = 1;
-    }
-    probe[fieldKey] = String(fieldPath || "");
-    if (!prefix) probe.fieldPath = String(fieldPath || "");
-    if (!String(probe[sourceKey] || "").trim() && prefix === "max") return "";
-    return previewDatabaseRawValue(probe, prefix);
-  }
-
   function enrichDatabaseFieldPickerOptions(optionsList, binding, prefix = "") {
     return (optionsList || []).map(opt => {
       const fieldPath = String(opt.value || "");
       const currentRaw = previewDatabaseBindingWithField(binding, fieldPath, prefix);
-      const defaultRaw = defaultDatabaseBindingFieldSample(binding, fieldPath, prefix);
+      // デフォルト = ツクール標準の項目名（名前/消費MP など）
+      const defaultName = String(opt.label || fieldPath || "");
       return Object.assign({}, opt, {
         currentText: formatDatabaseListSample(currentRaw),
-        defaultText: formatDatabaseListSample(defaultRaw)
+        defaultText: defaultName || "（未設定）"
       });
     });
   }
@@ -8958,11 +8939,11 @@ ${choiceRuleStructComment()}
     return (optionsList || []).map(opt => {
       const key = String(opt.value || "");
       const currentRaw = resolveDatabaseTermValue(terms, termCategory, key, 0);
-      // デフォルトは項目ラベル（標準名称）。プロジェクトで変えていても元の意味が分かるようにする。
-      const defaultRaw = String(opt.label || key || "");
+      // デフォルト = ツクール標準の用語名（戦う/レベル など）
+      const defaultName = String(opt.label || key || "");
       return Object.assign({}, opt, {
         currentText: formatDatabaseListSample(currentRaw),
-        defaultText: formatDatabaseListSample(defaultRaw)
+        defaultText: defaultName || "（未設定）"
       });
     });
   }
@@ -8971,8 +8952,9 @@ ${choiceRuleStructComment()}
     const value = String(fieldPath || "").trim();
     const hit = (optionsList || []).find(opt => String(opt.value) === value);
     if (hit) {
+      const defaultName = String(hit.defaultText || hit.label || hit.value || "");
       const group = String(hit.group || "").trim();
-      const base = group ? `${group} / ${hit.label}` : String(hit.label || hit.value);
+      const base = group ? `${group} / ${defaultName}` : defaultName;
       if (hit.currentText) return `${base}　現在:${hit.currentText}`;
       return base;
     }
@@ -9005,14 +8987,14 @@ ${choiceRuleStructComment()}
 
     const legend = document.createElement("div");
     legend.className = "db-field-picker-legend";
-    legend.textContent = "現在 = 選択中IDのプレビュー値 / デフォルト = ID1（基準）または標準名称";
+    legend.textContent = "デフォルト = ツクール標準の項目名 / 現在 = 選択中IDのプレビュー値";
     dialog.appendChild(legend);
 
     const controls = document.createElement("div");
     controls.className = "image-picker-controls db-picker-controls";
     const search = document.createElement("input");
     search.type = "search";
-    search.placeholder = "種類・項目名・現在値・デフォルト値で検索";
+    search.placeholder = "種類・デフォルト項目名・現在値で検索";
     controls.appendChild(search);
     dialog.appendChild(controls);
 
@@ -9047,16 +9029,16 @@ ${choiceRuleStructComment()}
         if (String(entry.value) === currentValue) row.classList.add("active");
         const group = String(entry.group || "その他");
         const currentText = String(entry.currentText || "（空）");
-        const defaultText = String(entry.defaultText || "（空）");
+        const defaultText = String(entry.defaultText || entry.label || entry.value || "（未設定）");
         row.innerHTML = `
           <span class="db-picker-id">${escapeHtml(group)}</span>
-          <span class="db-picker-name">${escapeHtml(entry.label || entry.value || "")}</span>
           <span class="db-picker-values">
-            <span class="db-picker-value-current"><em>現在</em>${escapeHtml(currentText)}</span>
             <span class="db-picker-value-default"><em>デフォルト</em>${escapeHtml(defaultText)}</span>
+            <span class="db-picker-value-current"><em>現在</em>${escapeHtml(currentText)}</span>
           </span>
+          <span class="db-picker-detail">${escapeHtml(entry.detail || entry.value || "")}</span>
         `;
-        row.title = `${group} / ${entry.label || ""} / 現在:${currentText} / デフォルト:${defaultText}`;
+        row.title = `${group} / デフォルト:${defaultText} / 現在:${currentText}`;
         row.addEventListener("click", () => {
           if (typeof options.onSelect === "function") options.onSelect(String(entry.value || ""), entry);
           overlay.remove();
