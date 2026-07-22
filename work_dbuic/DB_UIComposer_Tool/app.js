@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.55";
+  const TOOL_VERSION = "0.4.56";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";
@@ -8880,6 +8880,85 @@ ${choiceRuleStructComment()}
     setTimeout(() => search.focus(), 0);
   }
 
+  function databaseFieldSelectionLabel(fieldPath, optionsList = []) {
+    const value = String(fieldPath || "").trim();
+    const hit = (optionsList || []).find(opt => String(opt.value) === value);
+    if (hit) return `${hit.label}（${hit.value}）`;
+    if (!value) return "未選択";
+    return `カスタム: ${value}`;
+  }
+
+  function openDatabaseFieldPicker(options = {}) {
+    const entries = Array.isArray(options.options) ? options.options.slice() : [];
+    if (entries.length <= 0) {
+      showToast("選択できる項目がありません");
+      return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "image-picker-overlay db-picker-overlay";
+    const dialog = document.createElement("div");
+    dialog.className = "image-picker-dialog db-picker-dialog";
+    overlay.appendChild(dialog);
+
+    const header = document.createElement("div");
+    header.className = "image-picker-header";
+    header.innerHTML = `<strong>${escapeHtml(options.title || "項目を選択")}</strong><span>${entries.length}件</span>`;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "閉じる";
+    close.addEventListener("click", () => overlay.remove());
+    header.appendChild(close);
+    dialog.appendChild(header);
+
+    const controls = document.createElement("div");
+    controls.className = "image-picker-controls db-picker-controls";
+    const search = document.createElement("input");
+    search.type = "search";
+    search.placeholder = "項目名・パスで検索";
+    controls.appendChild(search);
+    dialog.appendChild(controls);
+
+    const list = document.createElement("div");
+    list.className = "db-picker-list";
+    dialog.appendChild(list);
+
+    const currentValue = String(options.currentValue || "");
+    const renderList = () => {
+      list.innerHTML = "";
+      const q = search.value.trim().toLowerCase();
+      const filtered = entries.filter(entry => {
+        if (!q) return true;
+        return String(entry.value || "").toLowerCase().includes(q)
+          || String(entry.label || "").toLowerCase().includes(q);
+      });
+      if (filtered.length <= 0) {
+        const empty = document.createElement("div");
+        empty.className = "image-picker-empty";
+        empty.textContent = "該当する項目がありません。";
+        list.appendChild(empty);
+        return;
+      }
+      for (const entry of filtered) {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "db-picker-row db-field-picker-row";
+        if (String(entry.value) === currentValue) row.classList.add("active");
+        row.innerHTML = `<span class="db-picker-name">${escapeHtml(entry.label || entry.value || "")}</span><span class="db-picker-detail">${escapeHtml(entry.value || "")}</span>`;
+        row.addEventListener("click", () => {
+          if (typeof options.onSelect === "function") options.onSelect(String(entry.value || ""), entry);
+          overlay.remove();
+        });
+        list.appendChild(row);
+      }
+    };
+    search.addEventListener("input", renderList);
+    renderList();
+    overlay.addEventListener("click", ev => { if (ev.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    setTimeout(() => search.focus(), 0);
+  }
+
   function databaseFieldOptionsForSource(sourceType, objectType = "item") {
     const actor = [
       ["name", "名前"], ["nickname", "二つ名"], ["profile", "プロフィール"], ["className", "職業名"],
@@ -9032,7 +9111,22 @@ ${choiceRuleStructComment()}
       addSelect(`${labelPrefix}用語キー`, db[termKeyKey] || termOptions[0]?.value || "", termOptions, value => { db[termKeyKey] = value; });
     } else if (db[sourceKey] !== "gold") {
       const optionsList = databaseFieldOptionsForSource(db[sourceKey], db[objectKey]);
-      if (optionsList.length) addSelect(`${labelPrefix}項目`, db[fieldKey] || optionsList[0].value, optionsList, value => { db[fieldKey] = value; });
+      if (!String(db[fieldKey] || "").trim() && optionsList[0]) db[fieldKey] = optionsList[0].value;
+      addReadonly(`${labelPrefix}選択中の項目`, databaseFieldSelectionLabel(db[fieldKey], optionsList));
+      if (optionsList.length) {
+        addButtonControl(`${labelPrefix}項目を一覧から選択`, () => {
+          openDatabaseFieldPicker({
+            title: `${labelPrefix}項目を選択`.trim() || "項目を選択",
+            options: optionsList,
+            currentValue: db[fieldKey] || "",
+            onSelect: (value) => {
+              runStateMutation(`${labelPrefix}項目選択`, () => {
+                db[fieldKey] = String(value || "");
+              });
+            }
+          });
+        });
+      }
       addTextInput(`${labelPrefix}任意項目パス`, db[fieldKey] || "", value => { db[fieldKey] = value; }, "例: meta.myTag / params[2]");
     }
 

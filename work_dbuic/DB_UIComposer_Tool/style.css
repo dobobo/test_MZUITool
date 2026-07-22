@@ -3416,6 +3416,10 @@ body.panel-resizing * {
   font-weight: 600;
 }
 
+.db-field-picker-row {
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1.2fr);
+}
+
 .db-picker-detail {
   color: var(--muted);
   font-size: 12px;
