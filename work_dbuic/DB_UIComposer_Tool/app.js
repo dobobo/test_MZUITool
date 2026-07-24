@@ -41,7 +41,7 @@
   const debugLogs = [];
   const debugOnceKeys = new Set();
   let debugConsoleVisible = false;
-  const TOOL_VERSION = "0.4.65";
+  const TOOL_VERSION = "0.4.66";
   const TOOL_DATA_TYPE = "DB_UIComposer_ToolData";
   const IDB_NAME = "DB_UIComposer_ToolDB";
   const IDB_STORE = "kv";

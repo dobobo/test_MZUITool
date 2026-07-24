@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v0.4.65 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
+ * @plugindesc v0.4.66 JSONレイアウトからマップ上UIウィンドウを再現する汎用UIコンポーザー
  * @author DB / ChatGPT
  * @url 
  *
@@ -72,6 +72,7 @@
  * v0.4.63では、データベース項目一覧に現在値とデフォルト値を表示するよう改善しています。
  * v0.4.64では、項目一覧のデフォルト表示をツクール標準の項目名へ修正しています。
  * v0.4.65では、項目一覧の表記を『項目名/挿入文字』へ変更し、基礎編03と応用編サンプルをデータベース代入中心へ再構成しています。
+ * v0.4.66では、ゲーム側の文字がツールより上に寄って欠ける問題を修正し、選択肢/ボタン等の縦位置をツールに近づけています。
  * 配置編集は同梱の DB_UIComposer_Tool/index.html で行います。
  *
  * ----------------------------------------------------------------------------
@@ -3371,6 +3372,27 @@
       return toNumber(this._dbUiLayoutSettings?.textYOffset, 0);
     }
 
+    // MZ Bitmap.drawText places the alphabetic baseline at
+    // y + lineHeight/2 + fontSize*0.35. That sits CJK glyphs optically
+    // higher than the Tool's CSS centering. Nudge draw Y downward.
+    dbOpticalTextYNudge(fontSize = null) {
+      const fs = Math.max(1, toNumber(fontSize, this.contents?.fontSize || 26));
+      return Math.round(fs * 0.12);
+    }
+
+    // Align text inside a fixed box (choice row / button / gauge label)
+    // using the box height itself — never Window_Base.lineHeight(), which
+    // is often larger than the box and produced a negative Y (top clipping).
+    dbBoxAlignedTextMetrics(boxY, boxHeight, outlineWidth = 0) {
+      const h = Math.max(1, toNumber(boxHeight, 1));
+      const ow = Math.max(0, toNumber(outlineWidth, 0));
+      const inset = Math.min(ow, Math.floor((h - 1) / 2));
+      return {
+        y: toNumber(boxY, 0) + inset + this.textYOffset(),
+        lineHeight: Math.max(1, h - inset * 2)
+      };
+    }
+
     applyDbUiWindowVisuals(definition) {
       const bgType = String(definition.backgroundType || "normal");
       const frameVisible = toBool(definition.frameVisible, true);
@@ -4189,9 +4211,11 @@
         }
       });
       this.contents = oldContents;
+      const outlinePad = Math.max(0, toNumber(style.outlineWidth, 0));
+      const opticalPad = Math.round(Math.max(1, toNumber(style.fontSize, 26)) * 0.12);
       return {
-        width: Math.max(1, explicitWidth > 0 ? explicitWidth : measuredWidth + Math.max(0, toNumber(style.outlineWidth, 0)) * 2 + 4),
-        height: Math.max(1, explicitHeight > 0 ? explicitHeight : lines.length * lineHeight + Math.max(0, toNumber(style.outlineWidth, 0)) * 2 + 4),
+        width: Math.max(1, explicitWidth > 0 ? explicitWidth : measuredWidth + outlinePad * 2 + 4),
+        height: Math.max(1, explicitHeight > 0 ? explicitHeight : lines.length * lineHeight + outlinePad * 2 + 4 + opticalPad),
         lineHeight
       };
     }
@@ -4211,8 +4235,10 @@
 
     dbDrawStableEscapedLine(line, x, y, width, lineHeight, align, style) {
       const hasEscape = String(line).includes("\x1b");
+      const fs = Math.max(1, toNumber(style?.fontSize, this.contents?.fontSize || 26));
+      const drawY = toNumber(y, 0) + this.dbOpticalTextYNudge(fs);
       if (!hasEscape) {
-        this.contents.drawText(String(line), x, y, width, lineHeight, align);
+        this.contents.drawText(String(line), x, drawY, width, lineHeight, align);
         return;
       }
 
@@ -4227,7 +4253,7 @@
       const flush = () => {
         if (!buffer) return;
         const partWidth = Math.ceil(this.textWidth(buffer)) + 4;
-        this.contents.drawText(buffer, cursorX, y, Math.max(1, partWidth), lineHeight, "left");
+        this.contents.drawText(buffer, cursorX, drawY, Math.max(1, partWidth), lineHeight, "left");
         cursorX += partWidth;
         buffer = "";
       };
@@ -4254,7 +4280,7 @@
           if (match) {
             const iconIndex = Number(match[1]);
             if (Number.isFinite(iconIndex) && iconIndex >= 0) {
-              this.drawIcon(iconIndex, cursorX, y + Math.floor((lineHeight - ImageManager.iconHeight) / 2));
+              this.drawIcon(iconIndex, cursorX, drawY + Math.floor((lineHeight - ImageManager.iconHeight) / 2));
               cursorX += ImageManager.iconWidth + 4;
             }
             i += match[0].length;
@@ -4666,7 +4692,20 @@
         else this.resetTextColor();
         if (item.outlineColor) this.contents.outlineColor = String(item.outlineColor);
         if (item.outlineWidth !== undefined) this.contents.outlineWidth = Math.max(0, toNumber(item.outlineWidth, this.contents.outlineWidth));
-        this.drawDbEscapedAlignedText(`${item.label} ${values.value}/${values.max}`, x, y - 2 + this.textYOffset(), width, "center");
+        // Tool centers the label over the gauge (CSS inset:-2px + place-items:center).
+        // Use a line box tall enough for the font so MZ's baseline math stays inside the box.
+        const fs = Math.max(1, toNumber(this.contents.fontSize, 18));
+        const ow = Math.max(0, toNumber(this.contents.outlineWidth, 0));
+        const labelBoxH = Math.max(height + 2, fs + ow * 2);
+        const labelBoxY = y + Math.floor((height - labelBoxH) / 2);
+        this.drawDbEscapedAlignedText(
+          `${item.label} ${values.value}/${values.max}`,
+          x,
+          labelBoxY + this.textYOffset(),
+          width,
+          "center",
+          labelBoxH
+        );
         this.contents.fontSize = oldSize;
         this.contents.fontFace = oldFace;
         this.contents.textColor = oldColor;
@@ -4736,7 +4775,8 @@
       this.contents = bitmap;
       withBitmapFont(bitmap, style, () => {
         const text = String(option.text || option.id || `choice${index + 1}`);
-        this.drawDbEscapedAlignedText(text, 0, Math.floor((height - this.lineHeight()) / 2), width, "center");
+        const metrics = this.dbBoxAlignedTextMetrics(0, height, style.outlineWidth);
+        this.drawDbEscapedAlignedText(text, 0, metrics.y, width, "center", metrics.lineHeight);
       });
       this.contents = oldContents;
       this._dbUiImageChoiceTextCache[cacheId] = { key, bitmap };
@@ -4973,12 +5013,14 @@
           const yy = row * (rowHeight + gap);
           const oldRowColor = bitmap.textColor;
           if (entry.state !== "enabled") bitmap.textColor = disabledTextColor;
+          const metrics = this.dbBoxAlignedTextMetrics(yy, rowHeight, style.outlineWidth);
           this.drawDbEscapedAlignedText(
             entry.text !== undefined ? entry.text : "",
             6,
-            yy + Math.floor((rowHeight - this.lineHeight()) / 2) + this.textYOffset(),
+            metrics.y,
             Math.max(1, width - 12 - textRightPadding),
-            align
+            align,
+            metrics.lineHeight
           );
           bitmap.textColor = oldRowColor;
         }
@@ -5364,7 +5406,8 @@
       if (String(item.text || "").length > 0) {
         this.contents.paintOpacity = oldPaintOpacity;
         withBitmapFont(this.contents, style, () => {
-          this.drawDbEscapedAlignedText(item.text || "", x, y + Math.floor((height - this.lineHeight()) / 2) + this.textYOffset(), width, "center");
+          const metrics = this.dbBoxAlignedTextMetrics(y, height, style.outlineWidth);
+          this.drawDbEscapedAlignedText(item.text || "", x, metrics.y, width, "center", metrics.lineHeight);
         });
       }
       this.contents.paintOpacity = oldPaintOpacity;
@@ -6134,7 +6177,7 @@
   });
 
   window.DB_UIComposer = {
-    version: "0.4.65",
+    version: "0.4.66",
     applyLayout,
     refreshScene,
     normalizeLayout,
